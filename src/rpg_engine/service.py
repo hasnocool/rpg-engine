@@ -127,7 +127,9 @@ class CampaignService:
                 try:
                     await asyncio.wait_for(
                         condition.wait_for(
-                            lambda: self._event_generations[campaign_id] != generation
+                            lambda generation=generation: (
+                                self._event_generations[campaign_id] != generation
+                            )
                         ),
                         timeout=heartbeat_seconds,
                     )
