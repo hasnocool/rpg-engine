@@ -1,0 +1,7 @@
+id: road_patrol
+title: Patrol the Old Road
+description: Travel to the old ruins and investigate signs of raider activity.
+target_location_ids: [ruins]
+reward_currency: gold
+reward_amount: 18
+expires_after_minutes: 1440

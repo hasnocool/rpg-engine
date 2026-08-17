@@ -1,0 +1,4 @@
+id: road_raiders
+name: Old Road Raiders
+base_relations:
+  riverdale: -35

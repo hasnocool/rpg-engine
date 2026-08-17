@@ -1,0 +1,13 @@
+id: common
+minutes_per_day: 1440
+days_per_year: 360
+starting_year: 1
+seasons:
+  - name: spring
+    start_day: 1
+  - name: summer
+    start_day: 91
+  - name: autumn
+    start_day: 181
+  - name: winter
+    start_day: 271
