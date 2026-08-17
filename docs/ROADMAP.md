@@ -84,13 +84,18 @@ The project is intentionally staged so simulation depth is built before expensiv
 - async per-actor coordination with provider timeouts
 - offline evaluation and deterministic scenario benchmarks
 
-## v0.8 — Multiplayer
+## v0.8 — Multiplayer (implemented)
 
-- authoritative hosted campaign service
-- authenticated players/party membership
-- optimistic client command IDs + idempotency
-- reconnect/resume and spectators
-- rate limits and horizontal campaign placement
+- authenticated hosted campaign service layered over `CampaignService`
+- PBKDF2 player credentials and expiring opaque sessions
+- owner/player/spectator campaign roles and controlled actor assignments
+- campaign parties with leader/member roles
+- optimistic `client_command_id` envelopes and persisted idempotency receipts
+- execution-lease fencing for abandoned in-flight command receipts
+- persisted reconnect/resume cursors with WebSocket heartbeats
+- spectator read-only access and conservative player event filtering
+- shared-database authentication/read/command rate limits
+- node heartbeats, rendezvous placement, leases, epochs, redirects, and failover
 
 ## v0.9 — Creator Platform
 
