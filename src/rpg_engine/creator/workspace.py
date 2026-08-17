@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 import threading
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -82,10 +83,8 @@ class CreatorWorkspace:
                 os.fsync(handle.fileno())
             os.replace(temp_name, path)
         except BaseException:
-            try:
+            with suppress(FileNotFoundError):
                 os.unlink(temp_name)
-            except FileNotFoundError:
-                pass
             raise
 
     def initialize(
