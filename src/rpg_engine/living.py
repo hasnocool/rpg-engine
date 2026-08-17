@@ -228,7 +228,8 @@ class LivingWorldRuntime:
             self.world.faction_relations.setdefault(faction_id, {})
         for faction_id, spec in sorted(self.content.factions.items()):
             for other_id, value in sorted(spec.base_relations.items()):
-                pair = tuple(sorted((faction_id, other_id)))
+                a, b = sorted((faction_id, other_id))
+                pair: tuple[str, str] = (a, b)
                 if pair in seen:
                     continue
                 seen.add(pair)
@@ -746,7 +747,7 @@ class LivingWorldRuntime:
             raise LivingWorldError(f"unknown resource node: {node_id}") from exc
         weather = self._weather_for_location(node.location_id)
         multiplier = self.ecology_hooks.regen_multiplier(node, weather, self.world)
-        amount = max(0, int(round(spec.regen_amount * multiplier)))
+        amount = max(0, round(spec.regen_amount * multiplier))
         previous = node.amount
         node.amount = min(node.capacity, node.amount + amount)
         node.last_regen_minute = self.world.calendar.absolute_minute
