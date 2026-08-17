@@ -1,4 +1,4 @@
-"""Typer commands for the v0.9 Creator Platform."""
+"""Typer commands for the stable v1 Creator Platform."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def init_workspace(
     name: Annotated[str, typer.Option(help="Human-readable pack name")],
     version: Annotated[str, typer.Option(help="Initial pack version")] = "0.1.0",
     ruleset: Annotated[str, typer.Option(help="Default ruleset ID")] = "d20",
-    engine: Annotated[str, typer.Option(help="Engine version constraint")] = ">=0.9,<1.0",
+    engine: Annotated[str, typer.Option(help="Engine version constraint")] = ">=1,<2",
     force: Annotated[bool, typer.Option(help="Allow initializing a non-empty directory")] = False,
 ) -> None:
     """Scaffold a content pack with runtime manifest, mod metadata, and editor directories."""
