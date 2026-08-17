@@ -183,9 +183,7 @@ def test_character_events_replay_draft_profile_and_entity() -> None:
     initial_draft.ability_scores = {}
     target.character_drafts["hero-draft"] = initial_draft
 
-    sequence = 0
-    for raw in raw_events:
-        sequence += 1
+    for sequence, raw in enumerate(raw_events, start=1):
         event = raw.model_copy(
             update={
                 "sequence": sequence,
