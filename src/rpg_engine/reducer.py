@@ -22,6 +22,12 @@ from rpg_engine.events import (
     ReactionUsedEvent,
     ResourceSpentEvent,
     TimeAdvancedEvent,
+    TimelineAdvancedEvent,
+    TimelineConfiguredEvent,
+    TimelineItemCancelledEvent,
+    TimelineItemFiredEvent,
+    TimelineItemScheduledEvent,
+    TimelinePauseChangedEvent,
     TriggerRaisedEvent,
     TurnStartedEvent,
 )
@@ -105,6 +111,32 @@ def apply_event(world: WorldState, event: Event) -> None:
             ]
             if not window.offers:
                 world.reaction_windows.pop(event.trigger_id, None)
+    elif isinstance(event, TimelineConfiguredEvent):
+        if not event.paused and world.timeline.paused:
+            world.timeline.paused = False
+        world.timeline.mode = event.mode
+        world.timeline.turn_quantum_ms = event.turn_quantum_ms
+        world.timeline.turn_timeout_ms = event.turn_timeout_ms
+        world.timeline.paused = event.paused
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+    elif isinstance(event, TimelineItemScheduledEvent):
+        item = event.item.model_copy(deep=True)
+        world.timeline.queue[item.id] = item
+        world.timeline.next_order = max(world.timeline.next_order, item.order + 1)
+    elif isinstance(event, TimelineItemCancelledEvent):
+        world.timeline.queue.pop(event.item_id, None)
+    elif isinstance(event, TimelineAdvancedEvent):
+        world.timeline.now_ms = event.time_ms
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+        world.time_minutes = event.time_ms // 60_000
+    elif isinstance(event, TimelineItemFiredEvent):
+        if event.rescheduled_item is None:
+            world.timeline.queue.pop(event.item.id, None)
+        else:
+            replacement = event.rescheduled_item.model_copy(deep=True)
+            world.timeline.queue[replacement.id] = replacement
+    elif isinstance(event, TimelinePauseChangedEvent):
+        world.timeline.paused = event.paused
 
     world.rng_counters.clear()
     world.rng_counters.update(event.rng_counters_after)
