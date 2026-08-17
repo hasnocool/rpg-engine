@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Input, RichLog, Static
@@ -20,7 +22,10 @@ class RPGTUI(App[None]):
     #events { width: 1fr; border: solid $secondary; }
     #command { dock: bottom; }
     """
-    BINDINGS = [("ctrl+q", "quit", "Quit"), ("ctrl+r", "refresh", "Refresh")]
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
+        ("ctrl+q", "quit", "Quit"),
+        ("ctrl+r", "refresh", "Refresh"),
+    ]
 
     def __init__(self, base_url: str, campaign_id: str, *, actor_id: str | None = None) -> None:
         super().__init__()
