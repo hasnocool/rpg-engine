@@ -3,11 +3,11 @@
 import pytest
 
 from rpg_engine.timeline import (
-    TimeMode,
     TimelineError,
     TimelineItemKind,
     TimelineScheduler,
     TimelineState,
+    TimeMode,
 )
 
 

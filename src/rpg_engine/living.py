@@ -87,16 +87,14 @@ class LivingWorldRuntime:
     def handles(command: Command) -> bool:
         return isinstance(
             command,
-            (
-                InitializeLivingWorldCommand,
-                AdjustFactionRelationCommand,
-                AdjustReputationCommand,
-                ResolveOffscreenEncounterCommand,
-                GenerateRumorCommand,
-                GenerateDynamicQuestCommand,
-                CompleteDynamicQuestCommand,
-                HarvestResourceCommand,
-            ),
+            InitializeLivingWorldCommand
+            | AdjustFactionRelationCommand
+            | AdjustReputationCommand
+            | ResolveOffscreenEncounterCommand
+            | GenerateRumorCommand
+            | GenerateDynamicQuestCommand
+            | CompleteDynamicQuestCommand
+            | HarvestResourceCommand,
         )
 
     def _entity(self, entity_id: str) -> Entity:

@@ -28,7 +28,7 @@ from rpg_engine.models import (
     WeatherState,
 )
 from rpg_engine.resolution import Modifier
-from rpg_engine.timeline import TimeMode, TimelineAdvanceSource, TimelineItem
+from rpg_engine.timeline import TimelineAdvanceSource, TimelineItem, TimeMode
 
 
 class EventBase(StrictModel):
@@ -586,7 +586,7 @@ Event = Annotated[
     Field(discriminator="type"),
 ]
 
-EVENT_ADAPTER = TypeAdapter(Event)
+EVENT_ADAPTER: TypeAdapter[Event] = TypeAdapter(Event)
 
 
 def parse_event(payload: object) -> Event:

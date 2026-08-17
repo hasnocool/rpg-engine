@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import Field, TypeAdapter, model_validator
 
 from rpg_engine.models import Ability, Entity, Position, StrictModel
-from rpg_engine.timeline import TimeMode, TimelineItemKind, TimelinePayload
+from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):
@@ -336,7 +336,7 @@ Command = Annotated[
     Field(discriminator="type"),
 ]
 
-COMMAND_ADAPTER = TypeAdapter(Command)
+COMMAND_ADAPTER: TypeAdapter[Command] = TypeAdapter(Command)
 
 
 def parse_command(payload: object) -> Command:
