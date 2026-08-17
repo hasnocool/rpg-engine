@@ -24,6 +24,7 @@ from rpg_engine.content.models import ContentRegistry
 from rpg_engine.events import (
     Event,
     EventBase,
+    TimeAdvancedEvent,
     TimelineAdvancedEvent,
     TimelineConfiguredEvent,
     TimelineItemCancelledEvent,
@@ -267,13 +268,7 @@ class SimulationEngine(TacticalSimulationEngine):
 
     def _post_tactical_timeline(self, command: Command) -> list[EventBase]:
         raw_events: list[EventBase] = []
-        if isinstance(command, AdvanceTimeCommand):
-            raw_events.extend(
-                self._advance_events(
-                    self.timeline.advance_legacy_world_time(command.minutes)
-                )
-            )
-        elif isinstance(command, StartEncounterCommand):
+        if isinstance(command, StartEncounterCommand):
             raw_events.extend(
                 self._schedule_turn_signals(command.encounter_id, advance_turn=False)
             )
@@ -334,6 +329,17 @@ class SimulationEngine(TacticalSimulationEngine):
                     raise SimulationError(str(exc)) from exc
                 events.extend(self._stamp_domain(self._advance_events(timeline_result)))
             return events
+
+        if isinstance(command, AdvanceTimeCommand):
+            self.world.time_minutes += command.minutes
+            return self._stamp_domain(
+                [
+                    TimeAdvancedEvent(
+                        minutes=command.minutes,
+                        time_minutes=self.world.time_minutes,
+                    )
+                ]
+            )
 
         base_events = super().execute(command)
         try:
