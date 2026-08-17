@@ -5,6 +5,7 @@ from __future__ import annotations
 from rpg_engine.adventure import AdventureError, AdventureRuntime
 from rpg_engine.commands import Command
 from rpg_engine.content.models import ContentRegistry
+from rpg_engine.events import Event
 from rpg_engine.hooks import HookRegistry
 from rpg_engine.models import WorldState
 from rpg_engine.rules.base import RulesRuntime
@@ -39,7 +40,7 @@ class SimulationEngine(TacticalSimulationEngine):
             rng=self.rng,
         )
 
-    def execute(self, command: Command):  # type: ignore[override]
+    def execute(self, command: Command) -> list[Event]:
         if AdventureRuntime.handles(command):
             try:
                 events = self.adventure.execute(command)

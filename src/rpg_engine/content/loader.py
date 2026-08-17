@@ -242,10 +242,10 @@ def load_content_pack(root: Path) -> ContentRegistry:
 
     for effect in _load_directory(root, "effects", EffectSpec):
         _store_unique(registry.effects, effect, category="effect")
-    for template in _load_directory(root, "containers", ContainerTemplateSpec):
-        _store_unique(registry.containers, template, category="container")
-    for template in _load_directory(root, "npcs", NpcTemplateSpec):
-        _store_unique(registry.npc_templates, template, category="NPC template")
+    for container_template in _load_directory(root, "containers", ContainerTemplateSpec):
+        _store_unique(registry.containers, container_template, category="container")
+    for npc_template in _load_directory(root, "npcs", NpcTemplateSpec):
+        _store_unique(registry.npc_templates, npc_template, category="NPC template")
     for dialogue in _load_directory(root, "dialogue", DialogueSpec):
         _store_unique(registry.dialogues, dialogue, category="dialogue")
     for quest in _load_directory(root, "quests", QuestSpec):

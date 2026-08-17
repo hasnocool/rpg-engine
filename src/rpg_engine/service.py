@@ -64,7 +64,7 @@ class CampaignService:
     async def execute(self, campaign_id: str, command: Command) -> list[Event]:
         async with self._locks[campaign_id]:
             engine = await self._load_engine(campaign_id)
-            events = engine.execute(command)
+            events: list[Event] = engine.execute(command)
             await self.store.append_events(campaign_id, events)
             if engine.world.sequence % self.snapshot_interval < len(events):
                 await self.store.save_snapshot(engine.world)
