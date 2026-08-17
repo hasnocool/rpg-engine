@@ -6,7 +6,14 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from rpg_engine.models import Ability, ActionKind, Entity, StrictModel, WeaponSpec
+from rpg_engine.models import (
+    Ability,
+    ActionKind,
+    Entity,
+    ResourcePool,
+    StrictModel,
+    WeaponSpec,
+)
 from rpg_engine.spatial import TargetingContract
 
 
@@ -329,6 +336,57 @@ class ResourceNodeSpec(StrictModel):
         return self
 
 
+class CharacterAncestrySpec(StrictModel):
+    """Race/ancestry choice used by the authoritative character creator."""
+
+    id: str
+    name: str
+    description: str = ""
+    ability_bonuses: dict[Ability, int] = Field(default_factory=dict)
+    movement_speed: int = Field(default=30, ge=0, le=200)
+    tags: set[str] = Field(default_factory=set)
+    languages: set[str] = Field(default_factory=set)
+
+    @model_validator(mode="after")
+    def validate_bonuses(self) -> CharacterAncestrySpec:
+        if any(not -5 <= value <= 5 for value in self.ability_bonuses.values()):
+            raise ValueError("ancestry ability bonuses must be between -5 and 5")
+        return self
+
+
+class CharacterClassSpec(StrictModel):
+    id: str
+    name: str
+    description: str = ""
+    hit_die: int = Field(default=8, ge=4, le=20)
+    primary_abilities: set[Ability] = Field(default_factory=set)
+    saving_throw_abilities: set[Ability] = Field(default_factory=set)
+    starting_item_ids: list[str] = Field(default_factory=list)
+    starting_currency: dict[str, int] = Field(default_factory=dict)
+    resource_pools: dict[str, ResourcePool] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_currency(self) -> CharacterClassSpec:
+        if any(value < 0 for value in self.starting_currency.values()):
+            raise ValueError("class starting currency cannot be negative")
+        return self
+
+
+class CharacterBackgroundSpec(StrictModel):
+    id: str
+    name: str
+    description: str = ""
+    starting_item_ids: list[str] = Field(default_factory=list)
+    starting_currency: dict[str, int] = Field(default_factory=dict)
+    tags: set[str] = Field(default_factory=set)
+
+    @model_validator(mode="after")
+    def validate_currency(self) -> CharacterBackgroundSpec:
+        if any(value < 0 for value in self.starting_currency.values()):
+            raise ValueError("background starting currency cannot be negative")
+        return self
+
+
 class ContentManifest(StrictModel):
     id: str
     name: str
@@ -357,6 +415,9 @@ class ContentRegistry(StrictModel):
     dynamic_quest_templates: dict[str, DynamicQuestTemplateSpec] = Field(default_factory=dict)
     rumor_templates: dict[str, RumorTemplateSpec] = Field(default_factory=dict)
     resource_nodes: dict[str, ResourceNodeSpec] = Field(default_factory=dict)
+    character_ancestries: dict[str, CharacterAncestrySpec] = Field(default_factory=dict)
+    character_classes: dict[str, CharacterClassSpec] = Field(default_factory=dict)
+    character_backgrounds: dict[str, CharacterBackgroundSpec] = Field(default_factory=dict)
 
     @classmethod
     def with_core_defaults(cls) -> ContentRegistry:

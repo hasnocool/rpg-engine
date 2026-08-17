@@ -7,6 +7,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator
 
+from rpg_engine.character_creation import CharacterCreationCatalog, build_character_creation_catalog
 from rpg_engine.commands import Command
 from rpg_engine.content.models import ContentRegistry
 from rpg_engine.events import Event
@@ -93,6 +94,9 @@ class CampaignService:
         async with self._locks[campaign_id]:
             engine = await self._load_engine(campaign_id)
             return build_observation(engine.world, self.content, viewer_id=actor_id)
+
+    async def character_creation_catalog(self) -> CharacterCreationCatalog:
+        return build_character_creation_catalog(self.content)
 
     async def events(self, campaign_id: str, *, after_sequence: int = 0) -> list[Event]:
         await self.store.get_seed(campaign_id)

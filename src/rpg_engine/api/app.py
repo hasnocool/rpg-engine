@@ -6,7 +6,6 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -19,6 +18,8 @@ from rpg_engine.api.contracts import (
     ObservationEnvelope,
     StateEnvelope,
 )
+from rpg_engine.character_creation import CharacterCreationCatalog
+from rpg_engine.character_web import CHARACTER_CREATOR_HTML
 from rpg_engine.commands import Command, parse_command
 from rpg_engine.content.loader import load_content_pack_async
 from rpg_engine.engine import SimulationError
@@ -28,11 +29,6 @@ from rpg_engine.observations import CampaignObservation
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
 from rpg_engine.webclient import INDEX_HTML
-
-if TYPE_CHECKING:
-    from fastapi import FastAPI
-
-_app_state_service: CampaignService | None = None
 
 
 def _event_envelope(campaign_id: str, events: list[Event], *, cursor: int) -> EventEnvelope:
@@ -69,9 +65,7 @@ def create_app(
         content = None
         if content_path is not None:
             content = await load_content_pack_async(Path(content_path))
-        global _app_state_service
-        _app_state_service = CampaignService(store, content=content)
-        app.state.service = _app_state_service
+        app.state.service = CampaignService(store, content=content)
         yield
 
     app = FastAPI(
@@ -83,8 +77,7 @@ def create_app(
     v1 = APIRouter(prefix="/api/v1")
 
     def service() -> CampaignService:
-        assert _app_state_service is not None
-        return _app_state_service
+        return app.state.service
 
     async def state_for(campaign_id: str) -> WorldState:
         try:
@@ -117,6 +110,14 @@ def create_app(
     @v1.get("/health", response_model=ApiInfo, operation_id="v1_health")
     async def v1_health() -> ApiInfo:
         return ApiInfo(engine_version=__version__)
+
+    @v1.get(
+        "/character-creation/catalog",
+        response_model=CharacterCreationCatalog,
+        operation_id="v1_character_creation_catalog",
+    )
+    async def v1_character_creation_catalog() -> CharacterCreationCatalog:
+        return await service().character_creation_catalog()
 
     @v1.post("/campaigns", response_model=StateEnvelope, operation_id="v1_create_campaign")
     async def v1_create_campaign(request: CampaignCreateRequest) -> StateEnvelope:
@@ -247,7 +248,10 @@ def create_app(
     async def browser_client() -> str:
         return INDEX_HTML
 
-    # Backward-compatible v0.1-v0.3 routes. New clients should use /api/v1.
+    @app.get("/character-creator", response_class=HTMLResponse, include_in_schema=False)
+    async def character_creator() -> str:
+        return CHARACTER_CREATOR_HTML
+
     @app.get("/health", deprecated=True)
     async def legacy_health() -> dict[str, str]:
         return {"status": "ok"}

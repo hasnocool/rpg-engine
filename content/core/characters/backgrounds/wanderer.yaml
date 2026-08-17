@@ -1,0 +1,7 @@
+id: wanderer
+name: Wanderer
+description: You learned to travel light and adapt to unfamiliar places.
+starting_item_ids: [healing_tonic]
+starting_currency:
+  gold: 5
+tags: [traveler]

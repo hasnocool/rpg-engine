@@ -1,0 +1,7 @@
+id: artisan
+name: Artisan
+description: You practiced a trade and learned the value of patient skilled work.
+starting_item_ids: []
+starting_currency:
+  gold: 15
+tags: [craft]

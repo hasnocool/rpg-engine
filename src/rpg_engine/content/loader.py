@@ -11,6 +11,9 @@ from pydantic import BaseModel
 
 from rpg_engine.content.models import (
     CalendarSpec,
+    CharacterAncestrySpec,
+    CharacterBackgroundSpec,
+    CharacterClassSpec,
     ContainerTemplateSpec,
     ContentManifest,
     ContentRegistry,
@@ -102,8 +105,7 @@ def _require_ids(
 ) -> None:
     missing = sorted(set(values) - set(available))
     if missing:
-        joined = ", ".join(missing)
-        raise ValueError(f"{owner} references unknown {category}: {joined}")
+        raise ValueError(f"{owner} references unknown {category}: {', '.join(missing)}")
 
 
 def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
@@ -214,10 +216,9 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                         )
                     unknown_states = sorted(allowed_states - quest.states)
                     if unknown_states:
-                        joined = ", ".join(unknown_states)
                         raise ValueError(
                             f"dialogue {dialogue.id} option {option.id} references unknown "
-                            f"quest states for {quest_id}: {joined}"
+                            f"quest states for {quest_id}: {', '.join(unknown_states)}"
                         )
                 for action in option.quest_actions:
                     quest = registry.quests.get(action.quest_id)
@@ -283,17 +284,17 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                 f"weather profile {profile.id} references unknown region: {profile.region_id}"
             )
 
-    for template in registry.dynamic_quest_templates.values():  # type: ignore
+    for template in registry.dynamic_quest_templates.values():
         _require_ids(
-            template.target_location_ids,  # type: ignore[attr-defined]
+            template.target_location_ids,
             registry.locations,
             owner=f"dynamic quest template {template.id}",
             category="locations",
         )
 
-    for rumor in registry.rumor_templates.values():  # type: ignore
+    for rumor in registry.rumor_templates.values():
         _require_ids(
-            [rumor.location_id],  # type: ignore[attr-defined]
+            [rumor.location_id],
             registry.locations,
             owner=f"rumor {rumor.id}",
             category="locations",
@@ -307,18 +308,34 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                 f"{rumor.quest_template_id}"
             )
 
-    for node in registry.resource_nodes.values():  # type: ignore
+    for node in registry.resource_nodes.values():
         _require_ids(
-            [node.location_id],  # type: ignore[attr-defined]
+            [node.location_id],
             registry.locations,
             owner=f"resource node {node.id}",
             category="locations",
         )
         _require_ids(
-            [node.item_id],  # type: ignore[attr-defined]
+            [node.item_id],
             registry.items,
             owner=f"resource node {node.id}",
             category="items",
+        )
+
+    for character_class in registry.character_classes.values():
+        _require_ids(
+            character_class.starting_item_ids,
+            registry.items,
+            owner=f"character class {character_class.id}",
+            category="starting items",
+        )
+
+    for background in registry.character_backgrounds.values():
+        _require_ids(
+            background.starting_item_ids,
+            registry.items,
+            owner=f"character background {background.id}",
+            category="starting items",
         )
 
     return registry
@@ -340,42 +357,51 @@ def load_content_pack(root: Path) -> ContentRegistry:
             if weapon is not None:
                 _store_unique(registry.weapons, weapon, category="weapon")
 
-    for effect in _load_directory(root, "effects", EffectSpec):
-        _store_unique(registry.effects, effect, category="effect")
-    for container_template in _load_directory(root, "containers", ContainerTemplateSpec):
-        _store_unique(registry.containers, container_template, category="container")
-    for npc_template in _load_directory(root, "npcs", NpcTemplateSpec):
-        _store_unique(registry.npc_templates, npc_template, category="NPC template")
-    for dialogue in _load_directory(root, "dialogue", DialogueSpec):
-        _store_unique(registry.dialogues, dialogue, category="dialogue")
-    for quest in _load_directory(root, "quests", QuestSpec):
-        _store_unique(registry.quests, quest, category="quest")
-    for merchant in _load_directory(root, "merchants", MerchantSpec):
-        _store_unique(registry.merchants, merchant, category="merchant")
-    for location in _load_directory(root, "world/locations", WorldLocationSpec):
-        _store_unique(registry.locations, location, category="location")
-    for connection in _load_directory(root, "world/connections", WorldConnectionSpec):
-        _store_unique(registry.connections, connection, category="connection")
-    for discovery in _load_directory(root, "world/discoveries", DiscoverySpec):
-        _store_unique(registry.discoveries, discovery, category="discovery")
-    for calendar in _load_directory(root, "world/calendars", CalendarSpec):
-        _store_unique(registry.calendars, calendar, category="calendar")
-    for profile in _load_directory(root, "weather", WeatherProfileSpec):
-        _store_unique(registry.weather_profiles, profile, category="weather profile")
-    for schedule in _load_directory(root, "schedules", NpcScheduleSpec):
-        _store_unique(registry.npc_schedules, schedule, category="NPC schedule")
-    for faction in _load_directory(root, "factions", FactionSpec):
-        _store_unique(registry.factions, faction, category="faction")
-    for settlement in _load_directory(root, "settlements", SettlementSpec):
-        _store_unique(registry.settlements, settlement, category="settlement")
-    for template in _load_directory(root, "dynamic_quests", DynamicQuestTemplateSpec):
-        _store_unique(
-            registry.dynamic_quest_templates, template, category="dynamic quest template"
-        )
-    for rumor in _load_directory(root, "rumors", RumorTemplateSpec):
-        _store_unique(registry.rumor_templates, rumor, category="rumor")
-    for node in _load_directory(root, "ecology", ResourceNodeSpec):
-        _store_unique(registry.resource_nodes, node, category="resource node")
+    specs: list[tuple[str, type[BaseModel], dict[str, Any], str]] = [
+        ("effects", EffectSpec, registry.effects, "effect"),
+        ("containers", ContainerTemplateSpec, registry.containers, "container"),
+        ("npcs", NpcTemplateSpec, registry.npc_templates, "NPC template"),
+        ("dialogue", DialogueSpec, registry.dialogues, "dialogue"),
+        ("quests", QuestSpec, registry.quests, "quest"),
+        ("merchants", MerchantSpec, registry.merchants, "merchant"),
+        ("world/locations", WorldLocationSpec, registry.locations, "location"),
+        ("world/connections", WorldConnectionSpec, registry.connections, "connection"),
+        ("world/discoveries", DiscoverySpec, registry.discoveries, "discovery"),
+        ("world/calendars", CalendarSpec, registry.calendars, "calendar"),
+        ("weather", WeatherProfileSpec, registry.weather_profiles, "weather profile"),
+        ("schedules", NpcScheduleSpec, registry.npc_schedules, "NPC schedule"),
+        ("factions", FactionSpec, registry.factions, "faction"),
+        ("settlements", SettlementSpec, registry.settlements, "settlement"),
+        (
+            "dynamic_quests",
+            DynamicQuestTemplateSpec,
+            registry.dynamic_quest_templates,
+            "dynamic quest template",
+        ),
+        ("rumors", RumorTemplateSpec, registry.rumor_templates, "rumor"),
+        ("ecology", ResourceNodeSpec, registry.resource_nodes, "resource node"),
+        (
+            "characters/ancestries",
+            CharacterAncestrySpec,
+            registry.character_ancestries,
+            "character ancestry",
+        ),
+        (
+            "characters/classes",
+            CharacterClassSpec,
+            registry.character_classes,
+            "character class",
+        ),
+        (
+            "characters/backgrounds",
+            CharacterBackgroundSpec,
+            registry.character_backgrounds,
+            "character background",
+        ),
+    ]
+    for relative, model, target, category in specs:
+        for item in _load_directory(root, relative, model):
+            _store_unique(target, item, category=category)
     return validate_content_registry(registry)
 
 

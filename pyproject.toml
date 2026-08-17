@@ -54,6 +54,7 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 # v0.4 branch compatibility: remove these once PR #6 lint-only cleanup lands.
 "src/rpg_engine/living.py" = ["RUF046"]
 "src/rpg_engine/timeline.py" = ["I001"]
+"src/rpg_engine/character_web.py" = ["E501"]
 "tests/test_timeline.py" = ["I001"]
 
 [tool.mypy]

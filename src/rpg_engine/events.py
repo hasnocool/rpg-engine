@@ -8,10 +8,13 @@ from pydantic import AliasChoices, Field, TypeAdapter
 
 from rpg_engine.models import (
     Ability,
+    AbilityGenerationMethod,
     ActionBudget,
     ActiveEffect,
     AiProposalRecord,
     CalendarState,
+    CharacterCreationDraft,
+    CharacterProfile,
     ContainerState,
     DialogueSession,
     DynamicQuestState,
@@ -42,6 +45,32 @@ class EventBase(StrictModel):
 class EntityCreatedEvent(EventBase):
     type: Literal["entity_created"] = "entity_created"
     entity: Entity
+
+
+class CharacterDraftCreatedEvent(EventBase):
+    type: Literal["character_draft_created"] = "character_draft_created"
+    draft: CharacterCreationDraft
+
+
+class CharacterDraftUpdatedEvent(EventBase):
+    type: Literal["character_draft_updated"] = "character_draft_updated"
+    draft: CharacterCreationDraft
+
+
+class CharacterAbilitiesGeneratedEvent(EventBase):
+    type: Literal["character_abilities_generated"] = "character_abilities_generated"
+    draft_id: str
+    method: AbilityGenerationMethod
+    score_pool: list[int]
+    rolls: list[list[int]] = Field(default_factory=list)
+    generation: int = Field(ge=1)
+
+
+class CharacterFinalizedEvent(EventBase):
+    type: Literal["character_finalized"] = "character_finalized"
+    draft_id: str
+    draft: CharacterCreationDraft
+    profile: CharacterProfile
 
 
 class ActorMovedEvent(EventBase):
@@ -411,7 +440,7 @@ class TimelineAdvancedEvent(EventBase):
     firings: int
     backlog: bool
     wall_clock_anchor_ms: int | None = None
-    time_ms: int  # kept for backward compatibility
+    time_ms: int
 
 
 class TimelineItemFiredEvent(EventBase):
@@ -547,6 +576,10 @@ class AiProposalActivatedEvent(EventBase):
 
 Event = Annotated[
     EntityCreatedEvent
+    | CharacterDraftCreatedEvent
+    | CharacterDraftUpdatedEvent
+    | CharacterAbilitiesGeneratedEvent
+    | CharacterFinalizedEvent
     | NpcSpawnedEvent
     | LocationDiscoveredEvent
     | LocationExploredEvent

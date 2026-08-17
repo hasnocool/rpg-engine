@@ -1,0 +1,7 @@
+id: scholar
+name: Scholar
+description: You spent years studying history, theory, languages, or natural philosophy.
+starting_item_ids: []
+starting_currency:
+  gold: 10
+tags: [learned]

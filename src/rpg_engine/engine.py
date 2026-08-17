@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rpg_engine.adventure import AdventureError, AdventureRuntime
 from rpg_engine.ai_runtime import AIGameMasterError, AIGameMasterRuntime
+from rpg_engine.character_creation import CharacterCreationError, CharacterCreationRuntime
 from rpg_engine.commands import (
     AdvanceTimeCommand,
     AdvanceTimelineCommand,
@@ -49,7 +50,7 @@ from rpg_engine.timeline import (
 
 
 class SimulationEngine(TacticalSimulationEngine):
-    """v0.1-v0.4 authority composed from tactical, adventure, timeline, and living domains."""
+    """Composed authority for tactical, adventure, living, AI, and character domains."""
 
     def __init__(
         self,
@@ -76,6 +77,11 @@ class SimulationEngine(TacticalSimulationEngine):
             rng=self.rng,
         )
         self.ai = AIGameMasterRuntime(self.world, content=self.content)
+        self.characters = CharacterCreationRuntime(
+            self.world,
+            content=self.content,
+            rng=self.rng,
+        )
         self.living = LivingWorldRuntime(
             self.world,
             content=self.content,
@@ -91,7 +97,10 @@ class SimulationEngine(TacticalSimulationEngine):
         events: list[EventBase] = [
             TimelineAdvancedEvent(
                 source=result.source,
+                previous_ms=result.previous_ms,
+                now_ms=result.now_ms,
                 delta_ms=result.delta_ms,
+                firings=len(result.fired),
                 time_ms=result.now_ms,
                 wall_clock_anchor_ms=result.wall_clock_anchor_ms,
                 backlog=result.backlog,
@@ -279,6 +288,12 @@ class SimulationEngine(TacticalSimulationEngine):
         timeline_events = self._execute_timeline_command(command)
         if timeline_events is not None:
             return timeline_events
+
+        if CharacterCreationRuntime.handles(command):
+            try:
+                return self._stamp_domain(self.characters.execute(command))
+            except CharacterCreationError as exc:
+                raise SimulationError(str(exc)) from exc
 
         if AIGameMasterRuntime.handles(command):
             try:

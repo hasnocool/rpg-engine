@@ -1,0 +1,9 @@
+id: wood_elf
+name: Wood Elf
+description: Graceful forest-dwellers with keen senses and practiced mobility.
+ability_bonuses:
+  dexterity: 2
+  wisdom: 1
+movement_speed: 35
+tags: [elf, forest]
+languages: [common, elven]
