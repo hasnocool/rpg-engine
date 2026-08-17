@@ -71,6 +71,7 @@ class TimelineSimulationEngine(SimulationEngine):
                 firings=len(result.fired),
                 backlog=result.backlog,
                 wall_clock_anchor_ms=result.wall_clock_anchor_ms,
+                time_ms=result.now_ms,
             )
         ]
         events.extend(
