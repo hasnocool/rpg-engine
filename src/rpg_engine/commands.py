@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from pydantic import Field, TypeAdapter
 
 from rpg_engine.models import Ability, Entity, Position, StrictModel
+from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):
@@ -175,6 +176,62 @@ class SellItemCommand(StrictModel):
     quantity: int = Field(default=1, ge=1, le=1000)
 
 
+class ConfigureTimelineCommand(StrictModel):
+    type: Literal["configure_timeline"] = "configure_timeline"
+    mode: TimeMode
+    turn_quantum_ms: int | None = None
+    turn_timeout_ms: int | None = None
+
+
+class AdvanceTimelineCommand(StrictModel):
+    type: Literal["advance_timeline"] = "advance_timeline"
+    delta_ms: int = Field(ge=0)
+    source: str = "manual"
+    max_firings: int | None = None
+
+
+class AdvanceTimelineTurnCommand(StrictModel):
+    type: Literal["advance_timeline_turn"] = "advance_timeline_turn"
+    turns: int = Field(default=1, ge=1)
+    max_firings: int | None = None
+
+
+class DrainTimelineCommand(StrictModel):
+    type: Literal["drain_timeline"] = "drain_timeline"
+    max_firings: int | None = None
+
+
+class ScheduleTimelineItemCommand(StrictModel):
+    type: Literal["schedule_timeline_item"] = "schedule_timeline_item"
+    item_id: str
+    kind: TimelineItemKind
+    delay_ms: int | None = None
+    due_ms: int | None = None
+    priority: int = 0
+    actor_id: str | None = None
+    payload: TimelinePayload | None = None
+    interval_ms: int | None = None
+    remaining_occurrences: int | None = None
+    replace: bool = False
+
+
+class CancelTimelineItemCommand(StrictModel):
+    type: Literal["cancel_timeline_item"] = "cancel_timeline_item"
+    item_id: str
+
+
+class SetTimelinePausedCommand(StrictModel):
+    type: Literal["set_timeline_paused"] = "set_timeline_paused"
+    paused: bool
+    wall_time_ms: int | None = None
+
+
+class SyncTimelineCommand(StrictModel):
+    type: Literal["sync_timeline"] = "sync_timeline"
+    wall_time_ms: int = Field(ge=0)
+    max_firings: int | None = None
+
+
 Command = Annotated[
     CreateEntityCommand
     | SpawnNpcCommand
@@ -200,7 +257,15 @@ Command = Annotated[
     | StartQuestCommand
     | AdvanceQuestCommand
     | BuyItemCommand
-    | SellItemCommand,
+    | SellItemCommand
+    | ConfigureTimelineCommand
+    | AdvanceTimelineCommand
+    | AdvanceTimelineTurnCommand
+    | DrainTimelineCommand
+    | ScheduleTimelineItemCommand
+    | CancelTimelineItemCommand
+    | SetTimelinePausedCommand
+    | SyncTimelineCommand,
     Field(discriminator="type"),
 ]
 

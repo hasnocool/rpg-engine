@@ -20,6 +20,7 @@ from rpg_engine.models import (
     StrictModel,
 )
 from rpg_engine.resolution import Modifier
+from rpg_engine.timeline import TimelineAdvanceSource, TimelineItem, TimeMode
 
 
 class EventBase(StrictModel):
@@ -372,6 +373,48 @@ class TransactionCompletedEvent(EventBase):
     seller_balance_after: int
 
 
+class TimelineConfiguredEvent(EventBase):
+    type: Literal["timeline_configured"] = "timeline_configured"
+    mode: TimeMode
+    turn_quantum_ms: int
+    turn_timeout_ms: int
+    paused: bool
+    wall_clock_anchor_ms: int | None
+
+
+class TimelineAdvancedEvent(EventBase):
+    type: Literal["timeline_advanced"] = "timeline_advanced"
+    source: TimelineAdvanceSource
+    previous_ms: int
+    now_ms: int
+    delta_ms: int
+    firings: int
+    backlog: bool
+    wall_clock_anchor_ms: int | None
+
+
+class TimelineItemScheduledEvent(EventBase):
+    type: Literal["timeline_item_scheduled"] = "timeline_item_scheduled"
+    item: TimelineItem
+
+
+class TimelineItemFiredEvent(EventBase):
+    type: Literal["timeline_item_fired"] = "timeline_item_fired"
+    item: TimelineItem
+    fired_at_ms: int
+    rescheduled_item: TimelineItem | None = None
+
+
+class TimelineItemCancelledEvent(EventBase):
+    type: Literal["timeline_item_cancelled"] = "timeline_item_cancelled"
+    item_id: str
+
+
+class TimelinePauseChangedEvent(EventBase):
+    type: Literal["timeline_pause_changed"] = "timeline_pause_changed"
+    paused: bool
+
+
 Event = Annotated[
     EntityCreatedEvent
     | NpcSpawnedEvent
@@ -390,6 +433,12 @@ Event = Annotated[
     | QuestStartedEvent
     | QuestAdvancedEvent
     | TransactionCompletedEvent
+    | TimelineConfiguredEvent
+    | TimelineAdvancedEvent
+    | TimelineItemScheduledEvent
+    | TimelineItemFiredEvent
+    | TimelineItemCancelledEvent
+    | TimelinePauseChangedEvent
     | ActorMovedEvent
     | CheckRolledEvent
     | SavingThrowRolledEvent

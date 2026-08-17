@@ -65,10 +65,12 @@ class TimelineSimulationEngine(SimulationEngine):
         events: list[EventBase] = [
             TimelineAdvancedEvent(
                 source=result.source,
+                previous_ms=result.previous_ms,
+                now_ms=result.now_ms,
                 delta_ms=result.delta_ms,
-                time_ms=result.now_ms,
-                wall_clock_anchor_ms=result.wall_clock_anchor_ms,
+                firings=len(result.fired),
                 backlog=result.backlog,
+                wall_clock_anchor_ms=result.wall_clock_anchor_ms,
             )
         ]
         events.extend(
@@ -184,21 +186,21 @@ class TimelineSimulationEngine(SimulationEngine):
                 result = self.timeline.advance(
                     command.delta_ms,
                     source=TimelineAdvanceSource.MANUAL,
-                    max_firings=command.max_firings,
+                    max_firings=command.max_firings if command.max_firings is not None else 10_000,
                 )
                 return self._stamp_timeline(self._advance_events(result))
 
             if isinstance(command, AdvanceTimelineTurnCommand):
                 result = self.timeline.advance_turn(
                     turns=command.turns,
-                    max_firings=command.max_firings,
+                    max_firings=command.max_firings if command.max_firings is not None else 10_000,
                 )
                 return self._stamp_timeline(self._advance_events(result))
 
             if isinstance(command, SyncTimelineCommand):
                 result = self.timeline.sync_wall_clock(
                     command.wall_time_ms,
-                    max_firings=command.max_firings,
+                    max_firings=command.max_firings if command.max_firings is not None else 10_000,
                 )
                 return self._stamp_timeline(self._advance_events(result))
 
@@ -214,7 +216,7 @@ class TimelineSimulationEngine(SimulationEngine):
                 if command.wall_time_ms is not None:
                     result = self.timeline.sync_wall_clock(
                         command.wall_time_ms,
-                        max_firings=command.max_firings,
+                        max_firings=10_000,
                     )
                     raw_events.extend(self._advance_events(result))
                 paused = self.timeline.set_paused(command.paused)
@@ -222,7 +224,8 @@ class TimelineSimulationEngine(SimulationEngine):
                 return self._stamp_timeline(raw_events)
 
             if isinstance(command, DrainTimelineCommand):
-                result = self.timeline.drain_due(max_firings=command.max_firings)
+                max_firings = command.max_firings if command.max_firings is not None else 10_000
+                result = self.timeline.drain_due(max_firings=max_firings)
                 return self._stamp_timeline(self._advance_events(result))
         except TimelineError as exc:
             raise SimulationError(str(exc)) from exc
