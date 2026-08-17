@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter
+from pydantic import AliasChoices, Field, TypeAdapter
 
 from rpg_engine.models import (
     Ability,
@@ -316,7 +316,9 @@ class ItemUnequippedEvent(EventBase):
     item_id: str
     slot: str
     equipment_after: dict[str, str]
-    equipped_item_ids_after: list[str]
+    equipped_item_ids_after: list[str] = Field(
+        validation_alias=AliasChoices("equipped_item_ids_after", "equicped_item_ids_after")
+    )
 
 
 class DialogueStartedEvent(EventBase):

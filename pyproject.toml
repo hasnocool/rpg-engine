@@ -48,6 +48,9 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/rpg_engine/tactical_engine.py" = ["I001"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

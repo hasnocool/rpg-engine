@@ -93,12 +93,8 @@ def test_search_reveals_hidden_connection_and_travel_advances_time() -> None:
 
 def test_hidden_connection_is_not_usable_before_discovery() -> None:
     engine = _engine(area="forest", seed=1)
-    try:
+    with pytest.raises(SimulationError, match="no known traversable connection"):
         engine.execute(TravelCommand(actor_id="hero", destination_id="ruins"))
-    except SimulationError as exc:
-        assert "no known traversable connection" in str(exc)
-    else:
-        raise AssertionError("hidden connection should require discovery")
 
 
 def test_npc_dialogue_quest_and_requirement_flow() -> None:
@@ -118,7 +114,9 @@ def test_npc_dialogue_quest_and_requirement_flow() -> None:
     node_id = engine.world.dialogue_sessions[session_id].node_id
     end_option = "leave" if node_id == "work" else "goodbye"
     engine.execute(
-        ChooseDialogueOptionCommand(actor_id="hero", session_id=session_id, option_id=end_option)
+        ChooseDialogueOptionCommand(
+            actor_id="hero", session_id=session_id, option_id=end_option
+        )
     )
     start = engine.execute(StartDialogueCommand(actor_id="hero", npc_id="torvald"))
     session_id = start[0].session.id  # type: ignore[attr-defined]

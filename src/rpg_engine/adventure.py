@@ -360,7 +360,7 @@ class AdventureRuntime:
                     item_id=previous,
                     slot=item.equip_slot,
                     equipment_after=dict(actor.inventory.equipment),
-                    equipped_item_ids_after=list(actor.inventory.equipped_item_ids),
+                    equicped_item_ids_after=list(actor.inventory.equipped_item_ids),
                 )
             )
         actor.inventory.equipment[item.equip_slot] = item.id

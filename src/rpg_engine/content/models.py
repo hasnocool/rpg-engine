@@ -162,9 +162,14 @@ class QuestSpec(StrictModel):
             raise ValueError("quest initial state must be declared")
         if not self.terminal_states <= self.states:
             raise ValueError("quest terminal states must be declared")
+        seen: set[tuple[str, str]] = set()
         for transition in self.transitions:
             if transition.from_state not in self.states or transition.to_state not in self.states:
                 raise ValueError("quest transition references undeclared state")
+            key = (transition.from_state, transition.trigger)
+            if key in seen:
+                raise ValueError("quest has ambiguous duplicate transition")
+            seen.add(key)
         return self
 
 
