@@ -68,7 +68,10 @@ def advance_jobs(
     raw: list[EventBase] = [
         TimelineAdvancedEvent(
             source=TimelineAdvanceSource.LEGACY_WORLD_TIME,
+            previous_ms=result.previous_ms,
+            now_ms=result.now_ms,
             delta_ms=result.delta_ms,
+            firings=len(result.fired),
             time_ms=result.now_ms,
             wall_clock_anchor_ms=result.wall_clock_anchor_ms,
             backlog=result.backlog,

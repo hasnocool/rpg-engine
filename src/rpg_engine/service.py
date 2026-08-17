@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 
 from rpg_engine.commands import Command
 from rpg_engine.content.models import ContentRegistry
+from rpg_engine.engine import SimulationEngine
 from rpg_engine.events import Event
 from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation, build_observation
@@ -16,7 +17,13 @@ from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.reducer import apply_event
 from rpg_engine.rules.base import RulesRuntime
 from rpg_engine.rules.d20 import D20RulesRuntime
-from rpg_engine.temporal import TimelineSimulationEngine
+from rpg_engine.visuals import (
+    PresentationBatch,
+    VisualBindingManifest,
+    VisualSnapshot,
+    build_visual_snapshot,
+    presentation_hints_for_event,
+)
 
 
 class CampaignService:
@@ -28,13 +35,15 @@ class CampaignService:
         *,
         content: ContentRegistry | None = None,
         rules: RulesRuntime | None = None,
+        visual_bindings: VisualBindingManifest | None = None,
         snapshot_interval: int = 100,
     ) -> None:
         self.store = store
         self.content = content or ContentRegistry.with_core_defaults()
         self.rules = rules or D20RulesRuntime()
+        self.visual_bindings = visual_bindings or VisualBindingManifest()
         self.snapshot_interval = max(1, snapshot_interval)
-        self._engines: dict[str, TimelineSimulationEngine] = {}
+        self._engines: dict[str, SimulationEngine] = {}
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._event_conditions: defaultdict[str, asyncio.Condition] = defaultdict(asyncio.Condition)
         self._event_generations: defaultdict[str, int] = defaultdict(int)
@@ -44,12 +53,12 @@ class CampaignService:
         world = WorldState(campaign_id=campaign_id, seed=seed)
         await self.store.create_campaign(campaign_id, seed)
         await self.store.save_snapshot(world)
-        self._engines[campaign_id] = TimelineSimulationEngine(
+        self._engines[campaign_id] = SimulationEngine(
             world, rules=self.rules, content=self.content
         )
         return world.model_copy(deep=True)
 
-    async def _load_engine(self, campaign_id: str) -> TimelineSimulationEngine:
+    async def _load_engine(self, campaign_id: str) -> SimulationEngine:
         cached = self._engines.get(campaign_id)
         if cached is not None:
             return cached
@@ -61,7 +70,7 @@ class CampaignService:
         events = await self.store.list_events(campaign_id, after_sequence=snapshot.sequence)
         for event in events:
             apply_event(snapshot, event)
-        engine = TimelineSimulationEngine(snapshot, rules=self.rules, content=self.content)
+        engine = SimulationEngine(snapshot, rules=self.rules, content=self.content)
         self._engines[campaign_id] = engine
         return engine
 
@@ -94,9 +103,25 @@ class CampaignService:
             engine = await self._load_engine(campaign_id)
             return build_observation(engine.world, self.content, viewer_id=actor_id)
 
+    async def visual(self, campaign_id: str, *, actor_id: str | None = None) -> VisualSnapshot:
+        async with self._locks[campaign_id]:
+            engine = await self._load_engine(campaign_id)
+            return build_visual_snapshot(
+                engine.world,
+                self.content,
+                viewer_id=actor_id,
+                bindings=self.visual_bindings,
+            )
+
     async def events(self, campaign_id: str, *, after_sequence: int = 0) -> list[Event]:
         await self.store.get_seed(campaign_id)
         return await self.store.list_events(campaign_id, after_sequence=after_sequence)
+
+    async def presentation(
+        self, campaign_id: str, *, after_sequence: int = 0
+    ) -> list[PresentationBatch]:
+        events = await self.events(campaign_id, after_sequence=after_sequence)
+        return [presentation_hints_for_event(event, self.visual_bindings) for event in events]
 
     async def stream_events(
         self,

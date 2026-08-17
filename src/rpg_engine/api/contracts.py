@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation
+from rpg_engine.visuals import PresentationBatch, VisualSnapshot
 
 API_VERSION = "v1"
 SCHEMA_VERSION = 1
@@ -30,6 +31,12 @@ class ObservationEnvelope(BaseModel):
     observation: CampaignObservation
 
 
+class VisualEnvelope(BaseModel):
+    schema_version: Literal[1] = 1
+    api_version: Literal["v1"] = "v1"
+    visual: VisualSnapshot
+
+
 class EventEnvelope(BaseModel):
     schema_version: Literal[1] = 1
     api_version: Literal["v1"] = "v1"
@@ -37,6 +44,16 @@ class EventEnvelope(BaseModel):
     from_sequence: int
     to_sequence: int
     events: list[dict[str, Any]] = Field(default_factory=list)
+    heartbeat: bool = False
+
+
+class PresentationEnvelope(BaseModel):
+    schema_version: Literal[1] = 1
+    api_version: Literal["v1"] = "v1"
+    campaign_id: str
+    from_sequence: int
+    to_sequence: int
+    batches: list[PresentationBatch] = Field(default_factory=list)
     heartbeat: bool = False
 
 
