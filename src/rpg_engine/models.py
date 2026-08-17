@@ -76,8 +76,12 @@ class Position(StrictModel):
 
 
 class Inventory(StrictModel):
+    """Backward-compatible inventory plus v0.3 equipment/currency state."""
+
     item_ids: list[str] = Field(default_factory=list)
     equipped_item_ids: list[str] = Field(default_factory=list)
+    equipment: dict[str, str] = Field(default_factory=dict)
+    currency: dict[str, int] = Field(default_factory=dict)
 
 
 class ResourcePool(StrictModel):
@@ -202,6 +206,41 @@ class ReactionWindow(StrictModel):
     offers: list[ReactionOffer] = Field(default_factory=list)
 
 
+class AdventureKnowledge(StrictModel):
+    """What one actor has authoritatively discovered in the adventure layer."""
+
+    location_ids: set[str] = Field(default_factory=set)
+    connection_ids: set[str] = Field(default_factory=set)
+    discovery_ids: set[str] = Field(default_factory=set)
+    container_ids: set[str] = Field(default_factory=set)
+
+
+class ContainerState(StrictModel):
+    id: str
+    name: str
+    location_id: str | None = None
+    owner_id: str | None = None
+    item_ids: list[str] = Field(default_factory=list)
+    currency: dict[str, int] = Field(default_factory=dict)
+    locked: bool = False
+
+
+class DialogueSession(StrictModel):
+    id: str
+    actor_id: str
+    npc_id: str
+    dialogue_id: str
+    node_id: str
+    active: bool = True
+
+
+class QuestProgress(StrictModel):
+    quest_id: str
+    state: str
+    started_by: str
+    completed: bool = False
+
+
 class WorldState(StrictModel):
     campaign_id: str
     seed: int
@@ -214,3 +253,8 @@ class WorldState(StrictModel):
     encounters: dict[str, EncounterState] = Field(default_factory=dict)
     active_effects: dict[str, ActiveEffect] = Field(default_factory=dict)
     reaction_windows: dict[str, ReactionWindow] = Field(default_factory=dict)
+    entity_templates: dict[str, str] = Field(default_factory=dict)
+    containers: dict[str, ContainerState] = Field(default_factory=dict)
+    knowledge: dict[str, AdventureKnowledge] = Field(default_factory=dict)
+    dialogue_sessions: dict[str, DialogueSession] = Field(default_factory=dict)
+    quest_progress: dict[str, dict[str, QuestProgress]] = Field(default_factory=dict)

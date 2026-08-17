@@ -1,0 +1,21 @@
+id: blacksmith
+entity:
+  id: blacksmith-template
+  identity:
+    name: Torvald
+    tags: [humanoid, merchant, blacksmith]
+  stats:
+    strength: 16
+    dexterity: 9
+    constitution: 14
+    intelligence: 11
+    wisdom: 12
+    charisma: 10
+    armor_class: 12
+  health:
+    current: 20
+    maximum: 20
+  inventory: {}
+  position: {}
+dialogue_id: torvald_intro
+merchant_id: blacksmith

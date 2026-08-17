@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter
 
 from rpg_engine.models import Ability, Entity, Position, StrictModel
-from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):
@@ -15,10 +14,34 @@ class CreateEntityCommand(StrictModel):
     entity: Entity
 
 
+class SpawnNpcCommand(StrictModel):
+    type: Literal["spawn_npc"] = "spawn_npc"
+    template_id: str
+    entity_id: str
+    location_id: str
+
+
 class MoveActorCommand(StrictModel):
     type: Literal["move_actor"] = "move_actor"
     actor_id: str
     position: Position
+
+
+class ExploreLocationCommand(StrictModel):
+    type: Literal["explore_location"] = "explore_location"
+    actor_id: str
+
+
+class SearchLocationCommand(StrictModel):
+    type: Literal["search_location"] = "search_location"
+    actor_id: str
+    ability: Ability = Ability.WISDOM
+
+
+class TravelCommand(StrictModel):
+    type: Literal["travel"] = "travel"
+    actor_id: str
+    destination_id: str
 
 
 class RollCheckCommand(StrictModel):
@@ -89,71 +112,76 @@ class UseReactionCommand(StrictModel):
     reaction_id: str
 
 
-class ConfigureTimelineCommand(StrictModel):
-    type: Literal["configure_timeline"] = "configure_timeline"
-    mode: TimeMode
-    turn_quantum_ms: int | None = Field(default=None, gt=0)
-    turn_timeout_ms: int | None = Field(default=None, gt=0)
+class LootContainerCommand(StrictModel):
+    type: Literal["loot_container"] = "loot_container"
+    actor_id: str
+    container_id: str
+    item_ids: list[str] | None = None
+    take_currency: bool = True
 
 
-class ScheduleTimelineItemCommand(StrictModel):
-    type: Literal["schedule_timeline_item"] = "schedule_timeline_item"
-    item_id: str
-    kind: TimelineItemKind
-    delay_ms: int | None = Field(default=None, ge=0)
-    due_ms: int | None = Field(default=None, ge=0)
-    priority: int = 0
-    actor_id: str | None = None
-    payload: TimelinePayload = Field(default_factory=dict)
-    interval_ms: int | None = Field(default=None, gt=0)
-    remaining_occurrences: int | None = Field(default=None, gt=0)
-    replace: bool = False
-
-    @model_validator(mode="after")
-    def validate_due_time(self) -> ScheduleTimelineItemCommand:
-        if self.delay_ms is not None and self.due_ms is not None:
-            raise ValueError("provide delay_ms or due_ms, not both")
-        return self
-
-
-class CancelTimelineItemCommand(StrictModel):
-    type: Literal["cancel_timeline_item"] = "cancel_timeline_item"
+class EquipItemCommand(StrictModel):
+    type: Literal["equip_item"] = "equip_item"
+    actor_id: str
     item_id: str
 
 
-class AdvanceTimelineCommand(StrictModel):
-    type: Literal["advance_timeline"] = "advance_timeline"
-    delta_ms: int = Field(gt=0)
-    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+class UnequipItemCommand(StrictModel):
+    type: Literal["unequip_item"] = "unequip_item"
+    actor_id: str
+    item_id: str
 
 
-class AdvanceTimelineTurnCommand(StrictModel):
-    type: Literal["advance_timeline_turn"] = "advance_timeline_turn"
-    turns: int = Field(default=1, gt=0, le=10_000)
-    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+class StartDialogueCommand(StrictModel):
+    type: Literal["start_dialogue"] = "start_dialogue"
+    actor_id: str
+    npc_id: str
+    dialogue_id: str | None = None
 
 
-class SyncTimelineCommand(StrictModel):
-    type: Literal["sync_timeline"] = "sync_timeline"
-    wall_time_ms: int = Field(ge=0)
-    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+class ChooseDialogueOptionCommand(StrictModel):
+    type: Literal["choose_dialogue_option"] = "choose_dialogue_option"
+    actor_id: str
+    session_id: str
+    option_id: str
 
 
-class SetTimelinePausedCommand(StrictModel):
-    type: Literal["set_timeline_paused"] = "set_timeline_paused"
-    paused: bool
-    wall_time_ms: int | None = Field(default=None, ge=0)
-    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+class StartQuestCommand(StrictModel):
+    type: Literal["start_quest"] = "start_quest"
+    actor_id: str
+    quest_id: str
 
 
-class DrainTimelineCommand(StrictModel):
-    type: Literal["drain_timeline"] = "drain_timeline"
-    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+class AdvanceQuestCommand(StrictModel):
+    type: Literal["advance_quest"] = "advance_quest"
+    actor_id: str
+    quest_id: str
+    trigger: str
+
+
+class BuyItemCommand(StrictModel):
+    type: Literal["buy_item"] = "buy_item"
+    actor_id: str
+    merchant_id: str
+    item_id: str
+    quantity: int = Field(default=1, ge=1, le=1000)
+
+
+class SellItemCommand(StrictModel):
+    type: Literal["sell_item"] = "sell_item"
+    actor_id: str
+    merchant_id: str
+    item_id: str
+    quantity: int = Field(default=1, ge=1, le=1000)
 
 
 Command = Annotated[
     CreateEntityCommand
+    | SpawnNpcCommand
     | MoveActorCommand
+    | ExploreLocationCommand
+    | SearchLocationCommand
+    | TravelCommand
     | RollCheckCommand
     | RollSavingThrowCommand
     | AttackTargetCommand
@@ -164,14 +192,15 @@ Command = Annotated[
     | AdvanceTimeCommand
     | EndTurnCommand
     | UseReactionCommand
-    | ConfigureTimelineCommand
-    | ScheduleTimelineItemCommand
-    | CancelTimelineItemCommand
-    | AdvanceTimelineCommand
-    | AdvanceTimelineTurnCommand
-    | SyncTimelineCommand
-    | SetTimelinePausedCommand
-    | DrainTimelineCommand,
+    | LootContainerCommand
+    | EquipItemCommand
+    | UnequipItemCommand
+    | StartDialogueCommand
+    | ChooseDialogueOptionCommand
+    | StartQuestCommand
+    | AdvanceQuestCommand
+    | BuyItemCommand
+    | SellItemCommand,
     Field(discriminator="type"),
 ]
 

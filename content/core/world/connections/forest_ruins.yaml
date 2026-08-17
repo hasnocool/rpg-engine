@@ -1,0 +1,6 @@
+id: forest_ruins
+from_location_id: forest
+to_location_id: ruins
+travel_minutes: 20
+bidirectional: true
+hidden: true

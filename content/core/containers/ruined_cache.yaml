@@ -1,0 +1,7 @@
+id: ruined_cache
+name: Forgotten Road Cache
+location_id: ruins
+item_ids: [longsword, healing_tonic]
+currency:
+  gold: 12
+locked: false

@@ -1,0 +1,9 @@
+id: old_road
+location_id: forest
+name: Forgotten Road
+ability: wisdom
+dc: 10
+description: Old wheel ruts and cut stones reveal a route toward distant ruins.
+reveal_location_ids: [ruins]
+reveal_connection_ids: [forest_ruins]
+reveal_container_ids: [ruined_cache]

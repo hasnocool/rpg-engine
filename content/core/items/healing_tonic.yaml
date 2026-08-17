@@ -1,0 +1,6 @@
+id: healing_tonic
+name: Healing Tonic
+value: 8
+weight: 0.5
+tags: [consumable]
+effect_id: lesser_heal

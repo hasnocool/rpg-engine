@@ -1,0 +1,7 @@
+id: village_crate
+location_id: village
+name: Supply Crate
+description: A public supply crate beside the adventurers' notice board.
+ability: wisdom
+dc: 0
+reveal_container_ids: [supply_crate]

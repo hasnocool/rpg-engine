@@ -6,3 +6,7 @@ damage_type: slashing
 attack_bonus: 0
 damage_bonus: 0
 range: 5
+value: 15
+weight: 3.0
+tags: [weapon, martial]
+equip_slot: hand

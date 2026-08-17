@@ -9,7 +9,13 @@ from rpg_engine.events import (
     ConcentrationStartedEvent,
     ConditionAddedEvent,
     ConditionRemovedEvent,
+    ContainerCreatedEvent,
+    ContainerLootedEvent,
     DamageAppliedEvent,
+    DialogueAdvancedEvent,
+    DialogueEndedEvent,
+    DialogueStartedEvent,
+    DiscoveryRevealedEvent,
     EffectActivatedEvent,
     EffectDurationTickedEvent,
     EffectExpiredEvent,
@@ -18,25 +24,81 @@ from rpg_engine.events import (
     EntityCreatedEvent,
     Event,
     HealingAppliedEvent,
+    ItemEquippedEvent,
+    ItemUnequippedEvent,
+    LocationDiscoveredEvent,
+    NpcSpawnedEvent,
+    QuestAdvancedEvent,
+    QuestStartedEvent,
     ReactionOfferedEvent,
     ReactionUsedEvent,
     ResourceSpentEvent,
     TimeAdvancedEvent,
-    TimelineAdvancedEvent,
-    TimelineConfiguredEvent,
-    TimelineItemCancelledEvent,
-    TimelineItemFiredEvent,
-    TimelineItemScheduledEvent,
-    TimelinePauseChangedEvent,
+    TransactionCompletedEvent,
+    TravelCompletedEvent,
     TriggerRaisedEvent,
     TurnStartedEvent,
 )
-from rpg_engine.models import ConcentrationState, ReactionWindow, WorldState
+from rpg_engine.models import AdventureKnowledge, ConcentrationState, ReactionWindow, WorldState
 
 
 def apply_event(world: WorldState, event: Event) -> None:
     if isinstance(event, EntityCreatedEvent):
         world.entities[event.entity.id] = event.entity.model_copy(deep=True)
+    elif isinstance(event, NpcSpawnedEvent):
+        world.entities[event.entity.id] = event.entity.model_copy(deep=True)
+        world.entity_templates[event.entity.id] = event.template_id
+    elif isinstance(event, LocationDiscoveredEvent):
+        knowledge = world.knowledge.setdefault(event.actor_id, AdventureKnowledge())
+        knowledge.location_ids.add(event.location_id)
+    elif isinstance(event, DiscoveryRevealedEvent):
+        knowledge = world.knowledge.setdefault(event.actor_id, AdventureKnowledge())
+        knowledge.discovery_ids.add(event.discovery_id)
+        knowledge.location_ids.update(event.location_ids)
+        knowledge.connection_ids.update(event.connection_ids)
+        knowledge.container_ids.update(event.container_ids)
+    elif isinstance(event, TravelCompletedEvent):
+        world.entities[event.actor_id].position = event.position.model_copy(deep=True)
+        world.time_minutes = event.time_minutes
+    elif isinstance(event, ContainerCreatedEvent):
+        world.containers[event.container.id] = event.container.model_copy(deep=True)
+    elif isinstance(event, ContainerLootedEvent):
+        actor = world.entities[event.actor_id]
+        container = world.containers[event.container_id]
+        actor.inventory.item_ids = list(event.actor_item_ids_after)
+        actor.inventory.currency = dict(event.actor_currency_after)
+        container.item_ids = list(event.container_item_ids_after)
+        container.currency = dict(event.container_currency_after)
+    elif isinstance(event, (ItemEquippedEvent, ItemUnequippedEvent)):
+        inventory = world.entities[event.actor_id].inventory
+        inventory.equipment = dict(event.equipment_after)
+        inventory.equipped_item_ids = list(event.equipped_item_ids_after)
+    elif isinstance(event, DialogueStartedEvent):
+        world.dialogue_sessions[event.session.id] = event.session.model_copy(deep=True)
+    elif isinstance(event, DialogueAdvancedEvent):
+        session = world.dialogue_sessions.get(event.session_id)
+        if session is not None:
+            session.node_id = event.to_node_id
+    elif isinstance(event, DialogueEndedEvent):
+        session = world.dialogue_sessions.get(event.session_id)
+        if session is not None:
+            session.active = False
+    elif isinstance(event, QuestStartedEvent):
+        world.quest_progress.setdefault(event.actor_id, {})[event.progress.quest_id] = (
+            event.progress.model_copy(deep=True)
+        )
+    elif isinstance(event, QuestAdvancedEvent):
+        progress = world.quest_progress.setdefault(event.actor_id, {}).get(event.quest_id)
+        if progress is not None:
+            progress.state = event.to_state
+            progress.completed = event.completed
+    elif isinstance(event, TransactionCompletedEvent):
+        buyer = world.entities[event.buyer_id]
+        seller = world.entities[event.seller_id]
+        buyer.inventory.item_ids = list(event.buyer_item_ids_after)
+        seller.inventory.item_ids = list(event.seller_item_ids_after)
+        buyer.inventory.currency[event.currency] = event.buyer_balance_after
+        seller.inventory.currency[event.currency] = event.seller_balance_after
     elif isinstance(event, ActorMovedEvent):
         world.entities[event.actor_id].position = event.position.model_copy(deep=True)
     elif isinstance(event, (DamageAppliedEvent, HealingAppliedEvent)):
@@ -111,32 +173,6 @@ def apply_event(world: WorldState, event: Event) -> None:
             ]
             if not window.offers:
                 world.reaction_windows.pop(event.trigger_id, None)
-    elif isinstance(event, TimelineConfiguredEvent):
-        if not event.paused and world.timeline.paused:
-            world.timeline.paused = False
-        world.timeline.mode = event.mode
-        world.timeline.turn_quantum_ms = event.turn_quantum_ms
-        world.timeline.turn_timeout_ms = event.turn_timeout_ms
-        world.timeline.paused = event.paused
-        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
-    elif isinstance(event, TimelineItemScheduledEvent):
-        item = event.item.model_copy(deep=True)
-        world.timeline.queue[item.id] = item
-        world.timeline.next_order = max(world.timeline.next_order, item.order + 1)
-    elif isinstance(event, TimelineItemCancelledEvent):
-        world.timeline.queue.pop(event.item_id, None)
-    elif isinstance(event, TimelineAdvancedEvent):
-        world.timeline.now_ms = event.time_ms
-        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
-        world.time_minutes = event.time_ms // 60_000
-    elif isinstance(event, TimelineItemFiredEvent):
-        if event.rescheduled_item is None:
-            world.timeline.queue.pop(event.item.id, None)
-        else:
-            replacement = event.rescheduled_item.model_copy(deep=True)
-            world.timeline.queue[replacement.id] = replacement
-    elif isinstance(event, TimelinePauseChangedEvent):
-        world.timeline.paused = event.paused
 
     world.rng_counters.clear()
     world.rng_counters.update(event.rng_counters_after)

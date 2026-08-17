@@ -34,24 +34,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - tactical event replay coverage
 - v0.1 compatibility outside encounters
 
-## v0.2.1 — First-class Time (implemented)
-
-- one persisted deterministic timeline for tactical and world scheduling
-- `turn_based`, `timed_turn_based`, `real_time`, `real_time_with_pause`, and `hybrid` modes
-- explicit monotonic wall-clock synchronization with deterministic replay
-- pause/resume semantics for pausable modes
-- actor readiness and turn-quantum advancement
-- delayed actions and spell-completion scheduling
-- recurring condition ticks and world events
-- NPC schedule, reaction-window, and idle-pressure item types
-- deterministic priority/insertion ordering
-- bounded catch-up with explicit backlog draining
-- timeline commands/events/reducer coverage
-- legacy `advance_time` compatibility
-
-See [`TIME.md`](TIME.md) for the scheduler contract and examples.
-
-## v0.3 — Adventure Engine (next)
+## v0.3 — Adventure Engine (implemented)
 
 - graph-based world maps and transitions
 - exploration/search/discovery
@@ -62,9 +45,9 @@ See [`TIME.md`](TIME.md) for the scheduler contract and examples.
 - merchants and transactions
 - travel commands/events
 
-## v0.4 — Living World
+## v0.4 — Living World (next)
 
-- calendar and scheduled world jobs built on the v0.2.1 timeline
+- calendar and scheduled world jobs
 - weather state
 - NPC schedules
 - faction relationships/reputation
@@ -134,8 +117,7 @@ See [`TIME.md`](TIME.md) for the scheduler contract and examples.
 ### Deterministic event sourcing
 
 Add command envelopes, command idempotency keys, rules/content version hashes, state hashes, replay,
-rewind, branching timelines, and verification tools. v0.2.1 already makes timeline mutations replayable
-through typed scheduler events.
+rewind, branching timelines, and verification tools.
 
 ### Spatial authority
 
@@ -145,5 +127,4 @@ pathfinding, line of sight, cover, terrain, and continuous-space semantics witho
 ### Intelligent living actors
 
 Add perception, goals, utility scoring, behavior trees, tactical planning, schedules, and persistent
-memories through the same command API used by humans. NPC schedules should use the first-class
-v0.2.1 timeline rather than a separate clock.
+memories through the same command API used by humans.
