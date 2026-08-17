@@ -10,12 +10,14 @@ from rpg_engine.models import (
     Ability,
     ActionBudget,
     ActiveEffect,
+    AiProposalRecord,
     CalendarState,
     ContainerState,
     DialogueSession,
     DynamicQuestState,
     EncounterState,
     Entity,
+    NpcMemory,
     NpcScheduleState,
     OffscreenEncounterRecord,
     Position,
@@ -521,6 +523,28 @@ class ResourceRegeneratedEvent(EventBase):
     weather_condition: str | None = None
 
 
+class NpcMemoryRecordedEvent(EventBase):
+    type: Literal["npc_memory_recorded"] = "npc_memory_recorded"
+    memory: NpcMemory
+
+
+class NpcMemoryForgottenEvent(EventBase):
+    type: Literal["npc_memory_forgotten"] = "npc_memory_forgotten"
+    actor_id: str
+    memory_id: str
+    reason: str
+
+
+class AiProposalEvaluatedEvent(EventBase):
+    type: Literal["ai_proposal_evaluated"] = "ai_proposal_evaluated"
+    record: AiProposalRecord
+
+
+class AiProposalActivatedEvent(EventBase):
+    type: Literal["ai_proposal_activated"] = "ai_proposal_activated"
+    record: AiProposalRecord
+
+
 Event = Annotated[
     EntityCreatedEvent
     | NpcSpawnedEvent
@@ -585,7 +609,11 @@ Event = Annotated[
     | DynamicQuestUpdatedEvent
     | ResourceNodeInitializedEvent
     | ResourceHarvestedEvent
-    | ResourceRegeneratedEvent,
+    | ResourceRegeneratedEvent
+    | NpcMemoryRecordedEvent
+    | NpcMemoryForgottenEvent
+    | AiProposalEvaluatedEvent
+    | AiProposalActivatedEvent,
     Field(discriminator="type"),
 ]
 

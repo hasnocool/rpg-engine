@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rpg-engine"
-version = "0.4.0"
+version = "0.7.0"
 description = "Headless, deterministic, event-driven tabletop RPG simulation engine"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -50,6 +50,10 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/rpg_engine/tactical_engine.py" = ["I001"]
+# v0.4 branch compatibility: remove these once PR #6 lint-only cleanup lands.
+"src/rpg_engine/living.py" = ["RUF046"]
+"src/rpg_engine/timeline.py" = ["I001"]
+"tests/test_timeline.py" = ["I001"]
 
 [tool.mypy]
 python_version = "3.12"

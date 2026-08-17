@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rpg_engine.adventure import AdventureError, AdventureRuntime
+from rpg_engine.ai_runtime import AIGameMasterError, AIGameMasterRuntime
 from rpg_engine.commands import (
     AdvanceTimeCommand,
     AdvanceTimelineCommand,
@@ -74,6 +75,7 @@ class SimulationEngine(TacticalSimulationEngine):
             rules=self.rules,
             rng=self.rng,
         )
+        self.ai = AIGameMasterRuntime(self.world, content=self.content)
         self.living = LivingWorldRuntime(
             self.world,
             content=self.content,
@@ -277,6 +279,22 @@ class SimulationEngine(TacticalSimulationEngine):
         timeline_events = self._execute_timeline_command(command)
         if timeline_events is not None:
             return timeline_events
+
+        if AIGameMasterRuntime.handles(command):
+            try:
+                result = self.ai.execute(command)
+            except AIGameMasterError as exc:
+                raise SimulationError(str(exc)) from exc
+            events = self._stamp_domain(list(result.events))
+            if result.follow_up is not None:
+                events.extend(self.execute(result.follow_up))
+                if result.proposal_id is not None:
+                    try:
+                        activated = self.ai.mark_activated(result.proposal_id)
+                    except AIGameMasterError as exc:
+                        raise SimulationError(str(exc)) from exc
+                    events.extend(self._stamp_domain([activated]))
+            return events
 
         if LivingWorldRuntime.handles(command):
             try:

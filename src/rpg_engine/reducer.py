@@ -5,6 +5,8 @@ from __future__ import annotations
 from rpg_engine.events import (
     ActionBudgetSpentEvent,
     ActorMovedEvent,
+    AiProposalActivatedEvent,
+    AiProposalEvaluatedEvent,
     CalendarAdvancedEvent,
     ConcentrationEndedEvent,
     ConcentrationStartedEvent,
@@ -32,6 +34,8 @@ from rpg_engine.events import (
     ItemUnequippedEvent,
     LivingWorldInitializedEvent,
     LocationDiscoveredEvent,
+    NpcMemoryForgottenEvent,
+    NpcMemoryRecordedEvent,
     NpcScheduleAppliedEvent,
     NpcSpawnedEvent,
     OffscreenEncounterResolvedEvent,
@@ -294,6 +298,19 @@ def apply_event(world: WorldState, event: Event) -> None:
         node = world.resource_nodes[event.node_id]
         node.amount = event.amount_after
         node.last_regen_minute = event.last_regen_minute
+
+    elif isinstance(event, NpcMemoryRecordedEvent):
+        memory = event.memory.model_copy(deep=True)
+        world.npc_memories.setdefault(memory.actor_id, {})[memory.id] = memory
+    elif isinstance(event, NpcMemoryForgottenEvent):
+        memories = world.npc_memories.get(event.actor_id)
+        if memories is not None:
+            memories.pop(event.memory_id, None)
+            if not memories:
+                world.npc_memories.pop(event.actor_id, None)
+    elif isinstance(event, (AiProposalEvaluatedEvent, AiProposalActivatedEvent)):
+        record = event.record.model_copy(deep=True)
+        world.ai_proposals[record.id] = record
 
     world.rng_counters.clear()
     world.rng_counters.update(event.rng_counters_after)
