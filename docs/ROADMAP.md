@@ -45,7 +45,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - merchants and transactions
 - travel commands/events
 
-## v0.4 — Living World (next)
+## v0.4 — Living World (planned; not yet implemented)
 
 - calendar and scheduled world jobs
 - weather state
@@ -56,14 +56,19 @@ The project is intentionally staged so simulation depth is built before expensiv
 - rumors and dynamic quest generation
 - resource regeneration and ecology hooks
 
-## v0.5 — Multiple Frontends
+## v0.5 — Multiple Frontends (implemented out of sequence)
 
-- interactive CLI
+- interactive async CLI
 - Rich/Textual TUI adapter
 - browser reference client
-- stable REST/OpenAPI contract
-- resumable WebSocket event subscriptions
+- stable `/api/v1` REST/OpenAPI contract
+- resumable WebSocket event subscriptions backed by persisted sequence cursors
 - renderer-neutral observation/query API
+- authenticated AsyncSSH terminal transport
+- shared `serve-all` API + SSH authority process
+
+v0.5 is intentionally implementable without v0.4 because it is a presentation/transport layer over
+existing campaign state. The next simulation-depth milestone remains v0.4.
 
 ## v0.6 — Visual Adapters
 

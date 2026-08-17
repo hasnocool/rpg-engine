@@ -2,52 +2,58 @@
 
 A **headless, deterministic, event-driven RPG simulation engine** for Python 3.12+.
 
-The authoritative simulation is presentation-agnostic. CLI, TUI, web, Discord, 2D, 3D, AI, and
-multiplayer clients issue the same commands and consume the same immutable events.
+The authoritative simulation is presentation-agnostic. CLI, TUI, browser, SSH terminal, web API,
+2D, 3D, AI, and multiplayer clients issue the same commands and consume the same immutable events.
 
 > The built-in `d20` runtime and `content/core` pack are original generic examples. This repository
 > does not bundle proprietary tabletop rulebooks or copyrighted campaign content. Licensed,
 > SRD-compatible, original, or homebrew rules/content belong in separate plugins and packs.
 
-## Current milestone: v0.3 Adventure Engine
+## Current milestone: v0.5 Multiple Frontends
 
-v0.3 adds a persistent adventure layer on top of the v0.1 deterministic core and v0.2 tactical
-runtime:
+v0.5 is implemented on top of the v0.3 Adventure Engine while v0.4 Living World remains a planned
+simulation-depth milestone. The frontend milestone is intentionally independent of the future living
+world systems.
 
-- graph-based world locations and travel connections
-- hidden connections and actor-specific discovery knowledge
-- deterministic exploration and location search checks
-- data-driven NPC templates
-- persistent containers, looting, equipment slots, and currency
-- dialogue graphs with requirements and d20 checks
-- event-sourced quest state machines
-- data-driven merchant profiles and authoritative buy/sell transactions
-- replay-safe travel, commerce, dialogue, inventory, knowledge, and quest state
-- compatibility with all v0.1/v0.2 commands
+v0.5 adds:
 
-The engine still knows nothing about pixels, meshes, terminal colors, cameras, WebGL, or input
-devices.
+- interactive asynchronous CLI
+- Textual TUI adapter
+- browser reference client
+- stable versioned `/api/v1` REST/OpenAPI contract
+- resumable WebSocket event subscriptions using persisted event cursors
+- renderer-neutral observation/query API
+- authenticated AsyncSSH terminal transport
+- shared `serve-all` mode for API + SSH on one authority service
+- compatibility aliases for the original unversioned API
+
+The core engine still knows nothing about pixels, terminal colors, browser layout, SSH, or input
+devices. Those concerns live entirely in adapters.
 
 ## Architecture
 
 ```text
-Human / AI / Client
-        |
-      Command
-        v
-+--------------------------------+
-| CampaignService                | async per-campaign authority
-| +----------------------------+ |
-| | SimulationEngine           | |
-| | + Tactical systems         | |
-| | + AdventureRuntime         | |
-| | + Rules / Hooks / RNG      | |
-| +-------------+--------------+ |
-+---------------|----------------+
-                | Events
-        +-------+---------+
-        |                 |
- SQLite/event log   WebSocket/UI
+                       GAME CLIENTS / TRANSPORTS
+
+     CLI          TUI          Browser          SSH terminal
+      |            |              |                  |
+      +------------+------ REST / WebSocket --------+
+                             or local client
+                                   |
+                                   v
++----------------------------------------------------------------+
+| CampaignService                                                |
+| async per-campaign authority + resumable persisted event feed   |
+| +------------------------------------------------------------+ |
+| | SimulationEngine                                           | |
+| | + Tactical systems                                         | |
+| | + AdventureRuntime                                         | |
+| | + Rules / Hooks / deterministic RNG                        | |
+| +----------------------------+-------------------------------+ |
++------------------------------|---------------------------------+
+                               | Events
+                               v
+                       SQLite event log
 ```
 
 The world itself is content-driven:
@@ -75,12 +81,96 @@ python -m pip install -e '.[dev]'
 
 ## Run
 
+Deterministic demo:
+
 ```bash
 rpg-engine demo --seed 918392482
+```
+
+REST/WebSocket/browser server:
+
+```bash
 rpg-engine serve --host 127.0.0.1 --port 8000
 ```
 
-Commands work through the same REST and WebSocket interfaces introduced in v0.1.
+Interactive terminal client:
+
+```bash
+rpg-engine play --server http://127.0.0.1:8000 --campaign demo
+```
+
+Textual TUI:
+
+```bash
+rpg-engine tui --server http://127.0.0.1:8000 --campaign demo
+```
+
+The browser reference client is served at `/client` by the API process.
+
+## SSH terminal
+
+v0.5 can expose the RPG terminal protocol through a normal SSH client. The SSH endpoint is not an
+operating-system shell and does not execute arbitrary host commands.
+
+```bash
+rpg-engine serve-ssh \
+  --host 127.0.0.1 \
+  --port 8022 \
+  --host-key ssh_host_key \
+  --authorized-keys authorized_keys \
+  --campaign demo
+```
+
+Then connect with a standard SSH client:
+
+```bash
+ssh -p 8022 player@127.0.0.1
+```
+
+When REST/WebSocket/browser and SSH should operate on the same live campaigns, use the shared
+single-process authority mode:
+
+```bash
+rpg-engine serve-all \
+  --api-host 127.0.0.1 --api-port 8000 \
+  --ssh-host 127.0.0.1 --ssh-port 8022 \
+  --host-key ssh_host_key \
+  --authorized-keys authorized_keys
+```
+
+See [`docs/FRONTENDS.md`](docs/FRONTENDS.md) for the transport model and terminal protocol.
+
+## Stable API v1
+
+New clients should use:
+
+```text
+GET  /api/v1/health
+POST /api/v1/campaigns
+GET  /api/v1/campaigns/{id}/state
+GET  /api/v1/campaigns/{id}/observation
+GET  /api/v1/campaigns/{id}/events?after=N
+POST /api/v1/campaigns/{id}/commands
+WS   /api/v1/campaigns/{id}/events/ws?after=N
+```
+
+WebSocket subscriptions resume from a persistent event sequence. A client which last processed
+sequence 418 can reconnect with `?after=418`; the service replays stored events 419 onward before
+waiting for new events. This does not depend on an in-memory broadcast buffer.
+
+## Renderer-neutral observations
+
+`CampaignObservation` gives frontends a logical view rather than forcing them to render raw
+`WorldState`. A viewer-specific observation can contain:
+
+- current logical location and known exits
+- co-located actors
+- encounter round/active actor/action budget summary
+- quest progress
+- active dialogue sessions
+- equipment and currency summaries
+
+Hidden world connections stay absent until the viewer has discovered them.
 
 ## Adventure command examples
 
@@ -148,7 +238,7 @@ Buy from an authoritative merchant inventory:
 
 ## Determinism and replay
 
-Randomness still uses named counter-based streams:
+Randomness uses named counter-based streams:
 
 ```text
 campaign seed + stream name + stream counter -> deterministic roll
@@ -161,6 +251,9 @@ Adventure events also preserve enough resulting state to replay historical decis
 re-running current content rules. For example, a commerce event stores the actual historical price,
 transferred quantity, and resulting inventories/balances. Changing a merchant price tomorrow does
 not rewrite yesterday's event history.
+
+v0.5 extends that replay property to client connectivity: event subscriptions are cursor-based and
+read from persistence, so presentation clients may disconnect without changing simulation results.
 
 ## World graph and discovery
 
@@ -246,11 +339,17 @@ merchant inventory, dialogue, discoveries, containers, and a quest for automated
 
 ```text
 src/rpg_engine/
-|- api/              # FastAPI + WebSocket adapter
+|- api/              # stable v1 REST/OpenAPI + resumable WebSocket adapter
+|- clients/          # local and async HTTP client adapters
 |- content/          # content schemas/loaders
 |- persistence/      # async event/snapshot storage
 |- rules/            # ruleset interface + generic d20 runtime
 |- adventure.py      # v0.3 world/dialogue/quest/inventory/economy authority
+|- observations.py   # renderer-neutral v0.5 query models
+|- terminal.py       # shared CLI/TUI/SSH terminal protocol
+|- tui.py            # Textual presentation adapter
+|- ssh_server.py     # authenticated AsyncSSH RPG transport
+|- webclient.py      # embedded browser reference client
 |- commands.py       # intent contracts
 |- events.py         # immutable facts
 |- models.py         # persistent world/entity/tactical/adventure state
@@ -260,8 +359,8 @@ src/rpg_engine/
 |- effects.py        # composable effect execution
 |- engine.py         # authoritative command processor
 |- reducer.py        # replay reconstruction
-|- service.py        # async concurrency/persistence boundary
-`- cli.py            # text adapter
+|- service.py        # async concurrency/persistence/event-stream boundary
+`- cli.py            # process entrypoints
 
 content/core/
 |- world/            # locations, connections, discoveries
@@ -281,8 +380,11 @@ ruff check .
 pytest --cov=rpg_engine --cov-report=term-missing
 ```
 
-## Next milestone
+## Roadmap
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md). The next milestone is **v0.4 Living World**: calendar
-scheduling, weather, NPC schedules, factions/reputation, settlement economy, off-screen encounter
-resolution, rumors/dynamic quests, and regeneration/ecology hooks.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+v0.5 Multiple Frontends is implemented out of sequence because it is transport/presentation work.
+The next unimplemented simulation-depth milestone remains **v0.4 Living World**: calendar scheduling,
+weather, NPC schedules, factions/reputation, settlement economy, off-screen encounter resolution,
+rumors/dynamic quests, and regeneration/ecology hooks.
