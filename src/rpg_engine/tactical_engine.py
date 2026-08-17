@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from rpg_engine.commands import (
-    AdvanceTimeCommand,
     ApplyAreaEffectCommand,
     ApplyEffectCommand,
     AttackTargetCommand,
@@ -44,7 +43,6 @@ from rpg_engine.events import (
     ReactionUsedEvent,
     ResourceSpentEvent,
     SavingThrowRolledEvent,
-    TimeAdvancedEvent,
     TriggerRaisedEvent,
     TurnEndedEvent,
     TurnStartedEvent,
@@ -669,15 +667,6 @@ class SimulationEngine:
                         effect, self._entity(target_id), source
                     )
                 )
-
-        elif isinstance(command, AdvanceTimeCommand):
-            self.world.time_minutes += command.minutes
-            raw_events = [
-                TimeAdvancedEvent(
-                    minutes=command.minutes,
-                    time_minutes=self.world.time_minutes,
-                )
-            ]
 
         elif isinstance(command, EndTurnCommand):
             self._entity(command.actor_id)

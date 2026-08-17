@@ -18,21 +18,20 @@ The project is intentionally staged so simulation depth is built before expensiv
 
 ## v0.2 — Tactical RPG (implemented)
 
-- encounter aggregate
-- deterministic initiative order
-- rounds/turn cursor
-- action, bonus-action, reaction, and movement budgets
-- typed resolution contexts/outcomes
-- modifier pipeline with provenance
-- trigger and reaction hooks
-- saving throws
-- concentration/resource pools
-- damage resistance/immunity/vulnerability
-- effect durations and expiry
-- areas of effect and targeting contracts
-- grid/graph spatial adapter interfaces
-- tactical event replay coverage
-- v0.1 compatibility outside encounters
+- encounter aggregate and deterministic initiative
+- rounds/turn cursor and action economy
+- typed resolution/modifier provenance
+- trigger/reaction hooks
+- saving throws, concentration, resources, and damage traits
+- effect durations and renderer-neutral spatial targeting
+- tactical event replay
+
+### v0.2.1 — First-class Time (integrated into v0.4)
+
+- `turn_based`, `timed_turn_based`, `real_time`, `real_time_with_pause`, and `hybrid`
+- one deterministic timeline for tactical and world scheduling
+- bounded recurrence/backlog draining
+- explicit monotonic wall-clock synchronization and pause semantics
 
 ## v0.3 — Adventure Engine (implemented)
 
@@ -45,18 +44,19 @@ The project is intentionally staged so simulation depth is built before expensiv
 - merchants and transactions
 - travel commands/events
 
-## v0.4 — Living World (next)
+## v0.4 — Living World (implemented)
 
 - calendar and scheduled world jobs
-- weather state
-- NPC schedules
-- faction relationships/reputation
+- deterministic regional weather
+- NPC schedules and logical movement
+- faction relationships and actor reputation
 - settlement/economy primitives
-- off-screen encounter resolution
-- rumors and dynamic quest generation
-- resource regeneration and ecology hooks
+- deterministic off-screen encounter resolution
+- recurring rumors and dynamic quest generation/expiry
+- resource harvesting, regeneration, and ecology hooks
+- full event/reducer replay coverage for living-world state
 
-## v0.5 — Multiple Frontends
+## v0.5 — Multiple Frontends (implemented)
 
 - interactive CLI
 - Rich/Textual TUI adapter
@@ -65,7 +65,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - resumable WebSocket event subscriptions
 - renderer-neutral observation/query API
 
-## v0.6 — Visual Adapters
+## v0.6 — Visual Adapters (planned)
 
 - Godot 2D adapter
 - Godot 3D adapter
@@ -73,14 +73,15 @@ The project is intentionally staged so simulation depth is built before expensiv
 - movement interpolation events
 - animation/VFX/audio binding hints that remain non-authoritative
 
-## v0.7 — AI Game Master
+## v0.7 — AI Game Master (implemented)
 
-- observation filtering
-- AI command-provider protocol
-- utility AI / behavior tree reference agents
-- narrator protocol
-- NPC memory/context store
+- actor-centric observation filtering
+- async AI command-provider protocol
+- deterministic utility AI and behavior-tree reference agents
+- async non-authoritative narrator protocol
+- event-sourced NPC memory/context store
 - procedural encounter/quest proposals requiring engine validation
+- async per-actor coordination with provider timeouts
 - offline evaluation and deterministic scenario benchmarks
 
 ## v0.8 — Multiplayer
@@ -88,17 +89,13 @@ The project is intentionally staged so simulation depth is built before expensiv
 - authoritative hosted campaign service
 - authenticated players/party membership
 - optimistic client command IDs + idempotency
-- reconnect/resume
-- spectators
-- rate limits and abuse controls
-- horizontal campaign placement
+- reconnect/resume and spectators
+- rate limits and horizontal campaign placement
 
 ## v0.9 — Creator Platform
 
 - content-pack SDK and schema tooling
-- campaign editor
-- map graph editor
-- creature/item/effect editors
+- campaign/map/creature/item/effect editors
 - rules plugin SDK
 - validation/lint tooling
 - dependency/version constraints for mods
@@ -106,8 +103,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 ## v1.0 — RPG Platform
 
 - stable engine/rules/content APIs
-- hosted campaigns
-- downloadable clients
+- hosted campaigns and downloadable clients
 - public engine API
 - community content distribution
 - optional creator marketplace
@@ -116,15 +112,15 @@ The project is intentionally staged so simulation depth is built before expensiv
 
 ### Deterministic event sourcing
 
-Add command envelopes, command idempotency keys, rules/content version hashes, state hashes, replay,
-rewind, branching timelines, and verification tools.
+Add command envelopes, idempotency keys, rules/content hashes, state hashes, replay verification,
+rewind, and branching timelines.
 
 ### Spatial authority
 
-v0.2 establishes grid/graph adapter contracts. Later milestones deepen these with occupancy, collision,
-pathfinding, line of sight, cover, terrain, and continuous-space semantics without renderer coupling.
+Deepen the v0.2 grid/graph contracts with occupancy, collision, pathfinding, line of sight, cover,
+terrain, and continuous-space semantics without renderer coupling.
 
 ### Intelligent living actors
 
-Add perception, goals, utility scoring, behavior trees, tactical planning, schedules, and persistent
-memories through the same command API used by humans.
+Build perception, goals, utility scoring, behavior trees, tactical planning, and persistent memories
+on top of v0.4 schedules and the same command API used by humans.

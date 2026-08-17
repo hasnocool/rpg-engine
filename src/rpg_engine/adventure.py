@@ -85,21 +85,19 @@ class AdventureRuntime:
     def handles(command: Command) -> bool:
         return isinstance(
             command,
-            (
-                SpawnNpcCommand,
-                ExploreLocationCommand,
-                SearchLocationCommand,
-                TravelCommand,
-                LootContainerCommand,
-                EquipItemCommand,
-                UnequipItemCommand,
-                StartDialogueCommand,
-                ChooseDialogueOptionCommand,
-                StartQuestCommand,
-                AdvanceQuestCommand,
-                BuyItemCommand,
-                SellItemCommand,
-            ),
+            SpawnNpcCommand
+            | ExploreLocationCommand
+            | SearchLocationCommand
+            | TravelCommand
+            | LootContainerCommand
+            | EquipItemCommand
+            | UnequipItemCommand
+            | StartDialogueCommand
+            | ChooseDialogueOptionCommand
+            | StartQuestCommand
+            | AdvanceQuestCommand
+            | BuyItemCommand
+            | SellItemCommand,
         )
 
     def _entity(self, entity_id: str) -> Entity:

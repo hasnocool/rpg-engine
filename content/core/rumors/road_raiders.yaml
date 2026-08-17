@@ -1,0 +1,7 @@
+id: road_raiders
+text: Travelers say raiders have been seen near the old ruins.
+location_id: village
+weight: 1
+interval_minutes: 480
+expires_after_minutes: 720
+quest_template_id: road_patrol

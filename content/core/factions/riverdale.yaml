@@ -1,0 +1,4 @@
+id: riverdale
+name: Riverdale Folk
+base_relations:
+  road_raiders: -35

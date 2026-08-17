@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rpg-engine"
-version = "0.3.0"
+version = "0.9.0"
 description = "Headless, deterministic, event-driven tabletop RPG simulation engine"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,7 @@ authors = [{name = "hasnocool"}]
 dependencies = [
   "aiosqlite>=0.22.1,<1",
   "fastapi>=0.138.2,<1",
+  "packaging>=25,<27",
   "pydantic>=2.13.4,<3",
   "PyYAML>=6.0.3,<7",
   "typer>=0.27,<1",
@@ -50,6 +51,10 @@ select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/rpg_engine/tactical_engine.py" = ["I001"]
+# v0.4 branch compatibility: remove these once PR #6 lint-only cleanup lands.
+"src/rpg_engine/living.py" = ["RUF046"]
+"src/rpg_engine/timeline.py" = ["I001"]
+"tests/test_timeline.py" = ["I001"]
 
 [tool.mypy]
 python_version = "3.12"

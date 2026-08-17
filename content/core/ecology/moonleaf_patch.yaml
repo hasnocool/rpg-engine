@@ -1,0 +1,7 @@
+id: moonleaf_patch
+location_id: forest
+item_id: moonleaf
+capacity: 12
+initial_amount: 8
+regen_amount: 2
+regen_interval_minutes: 360

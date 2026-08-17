@@ -133,7 +133,7 @@ _PAUSABLE_MODES = {TimeMode.REAL_TIME_WITH_PAUSE, TimeMode.HYBRID}
 
 
 class TimelineScheduler:
-    """Bounded, non-blocking deterministic scheduler over a persisted timeline state.
+    """Bounded, non-blocking deterministic scheduler over persisted timeline state.
 
     The scheduler never sleeps and never reads a clock itself. Real-time modes advance only from an
     explicit monotonic millisecond value supplied by the caller, so replay uses the same inputs and
@@ -288,12 +288,7 @@ class TimelineScheduler:
         actor_id: str | None,
         kwargs: ScheduleOptions,
     ) -> TimelineItem:
-        return self.schedule(
-            item_id,
-            kind,
-            actor_id=actor_id,
-            **kwargs,
-        )
+        return self.schedule(item_id, kind, actor_id=actor_id, **kwargs)
 
     @staticmethod
     def _heap_key(item: TimelineItem) -> tuple[int, int, int, str]:
@@ -336,7 +331,6 @@ class TimelineScheduler:
                 )
                 interval = current.interval_ms
                 if interval is None:
-                    # Should not happen due to validator, but guard for type checker
                     interval = 0
                 rescheduled = current.model_copy(
                     update={

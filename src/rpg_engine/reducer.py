@@ -5,6 +5,9 @@ from __future__ import annotations
 from rpg_engine.events import (
     ActionBudgetSpentEvent,
     ActorMovedEvent,
+    AiProposalActivatedEvent,
+    AiProposalEvaluatedEvent,
+    CalendarAdvancedEvent,
     ConcentrationEndedEvent,
     ConcentrationStartedEvent,
     ConditionAddedEvent,
@@ -16,6 +19,8 @@ from rpg_engine.events import (
     DialogueEndedEvent,
     DialogueStartedEvent,
     DiscoveryRevealedEvent,
+    DynamicQuestGeneratedEvent,
+    DynamicQuestUpdatedEvent,
     EffectActivatedEvent,
     EffectDurationTickedEvent,
     EffectExpiredEvent,
@@ -23,16 +28,29 @@ from rpg_engine.events import (
     EncounterStartedEvent,
     EntityCreatedEvent,
     Event,
+    FactionRelationChangedEvent,
     HealingAppliedEvent,
     ItemEquippedEvent,
     ItemUnequippedEvent,
+    LivingWorldInitializedEvent,
     LocationDiscoveredEvent,
+    NpcMemoryForgottenEvent,
+    NpcMemoryRecordedEvent,
+    NpcScheduleAppliedEvent,
     NpcSpawnedEvent,
+    OffscreenEncounterResolvedEvent,
     QuestAdvancedEvent,
     QuestStartedEvent,
     ReactionOfferedEvent,
     ReactionUsedEvent,
+    ReputationChangedEvent,
+    ResourceHarvestedEvent,
+    ResourceNodeInitializedEvent,
+    ResourceRegeneratedEvent,
     ResourceSpentEvent,
+    RumorGeneratedEvent,
+    SettlementEconomyTickedEvent,
+    SettlementInitializedEvent,
     TimeAdvancedEvent,
     TimelineAdvancedEvent,
     TimelineConfiguredEvent,
@@ -44,6 +62,7 @@ from rpg_engine.events import (
     TravelCompletedEvent,
     TriggerRaisedEvent,
     TurnStartedEvent,
+    WeatherChangedEvent,
 )
 from rpg_engine.models import AdventureKnowledge, ConcentrationState, ReactionWindow, WorldState
 
@@ -75,7 +94,7 @@ def apply_event(world: WorldState, event: Event) -> None:
         actor.inventory.currency = dict(event.actor_currency_after)
         container.item_ids = list(event.container_item_ids_after)
         container.currency = dict(event.container_currency_after)
-    elif isinstance(event, (ItemEquippedEvent, ItemUnequippedEvent)):
+    elif isinstance(event, ItemEquippedEvent | ItemUnequippedEvent):
         inventory = world.entities[event.actor_id].inventory
         inventory.equipment = dict(event.equipment_after)
         inventory.equipped_item_ids = list(event.equipped_item_ids_after)
@@ -107,7 +126,7 @@ def apply_event(world: WorldState, event: Event) -> None:
         seller.inventory.currency[event.currency] = event.seller_balance_after
     elif isinstance(event, ActorMovedEvent):
         world.entities[event.actor_id].position = event.position.model_copy(deep=True)
-    elif isinstance(event, (DamageAppliedEvent, HealingAppliedEvent)):
+    elif isinstance(event, DamageAppliedEvent | HealingAppliedEvent):
         health = world.entities[event.target_id].health
         if health is not None:
             health.current = event.hp_after
@@ -201,6 +220,97 @@ def apply_event(world: WorldState, event: Event) -> None:
             ]
             if not window.offers:
                 world.reaction_windows.pop(event.trigger_id, None)
+    elif isinstance(event, TimelineConfiguredEvent):
+        world.timeline.mode = event.mode
+        world.timeline.turn_quantum_ms = event.turn_quantum_ms
+        world.timeline.turn_timeout_ms = event.turn_timeout_ms
+        world.timeline.paused = event.paused
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+    elif isinstance(event, TimelineItemScheduledEvent):
+        item = event.item.model_copy(deep=True)
+        world.timeline.queue[item.id] = item
+        world.timeline.next_order = max(world.timeline.next_order, item.order + 1)
+    elif isinstance(event, TimelineItemCancelledEvent):
+        world.timeline.queue.pop(event.item_id, None)
+    elif isinstance(event, TimelineAdvancedEvent):
+        world.timeline.now_ms = event.time_ms
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+        world.time_minutes = event.time_ms // 60_000
+    elif isinstance(event, TimelineItemFiredEvent):
+        world.timeline.queue.pop(event.item.id, None)
+        if event.rescheduled_item is not None:
+            rescheduled = event.rescheduled_item.model_copy(deep=True)
+            world.timeline.queue[rescheduled.id] = rescheduled
+            world.timeline.next_order = max(world.timeline.next_order, rescheduled.order + 1)
+    elif isinstance(event, TimelinePauseChangedEvent):
+        world.timeline.paused = event.paused
+    elif isinstance(event, LivingWorldInitializedEvent):
+        world.living_world_initialized = True
+    elif isinstance(event, CalendarAdvancedEvent):
+        world.calendar = event.calendar.model_copy(deep=True)
+    elif isinstance(event, WeatherChangedEvent):
+        world.weather[event.weather.profile_id] = event.weather.model_copy(deep=True)
+    elif isinstance(event, NpcScheduleAppliedEvent):
+        state = event.schedule.model_copy(deep=True)
+        world.npc_schedules[state.actor_id] = state
+        actor = world.entities.get(state.actor_id)
+        if actor is not None:
+            actor.position = event.position.model_copy(deep=True)
+    elif isinstance(event, FactionRelationChangedEvent):
+        world.faction_relations.setdefault(event.faction_a_id, {})[
+            event.faction_b_id
+        ] = event.current
+        world.faction_relations.setdefault(event.faction_b_id, {})[
+            event.faction_a_id
+        ] = event.current
+    elif isinstance(event, ReputationChangedEvent):
+        world.reputation.setdefault(event.actor_id, {})[event.faction_id] = event.current
+    elif isinstance(event, SettlementInitializedEvent | SettlementEconomyTickedEvent):
+        world.settlements[event.settlement.id] = event.settlement.model_copy(deep=True)
+    elif isinstance(event, OffscreenEncounterResolvedEvent):
+        record = event.record.model_copy(deep=True)
+        world.offscreen_encounters[record.id] = record
+        for actor_id, hp_after in record.health_after.items():
+            actor = world.entities.get(actor_id)
+            if actor is not None and actor.health is not None:
+                actor.health.current = hp_after
+    elif isinstance(event, RumorGeneratedEvent):
+        world.rumors[event.rumor.id] = event.rumor.model_copy(deep=True)
+    elif isinstance(event, DynamicQuestGeneratedEvent | DynamicQuestUpdatedEvent):
+        world.dynamic_quests[event.quest.id] = event.quest.model_copy(deep=True)
+        if (
+            isinstance(event, DynamicQuestUpdatedEvent)
+            and event.actor_id is not None
+            and event.reward_currency is not None
+            and event.actor_balance_after is not None
+        ):
+            actor = world.entities.get(event.actor_id)
+            if actor is not None:
+                actor.inventory.currency[event.reward_currency] = event.actor_balance_after
+    elif isinstance(event, ResourceNodeInitializedEvent):
+        world.resource_nodes[event.node.id] = event.node.model_copy(deep=True)
+    elif isinstance(event, ResourceHarvestedEvent):
+        node = world.resource_nodes[event.node_id]
+        node.amount = event.node_amount_after
+        actor = world.entities[event.actor_id]
+        actor.inventory.item_ids = list(event.actor_item_ids_after)
+    elif isinstance(event, ResourceRegeneratedEvent):
+        node = world.resource_nodes[event.node_id]
+        node.amount = event.amount_after
+        node.last_regen_minute = event.last_regen_minute
+
+    elif isinstance(event, NpcMemoryRecordedEvent):
+        memory = event.memory.model_copy(deep=True)
+        world.npc_memories.setdefault(memory.actor_id, {})[memory.id] = memory
+    elif isinstance(event, NpcMemoryForgottenEvent):
+        memories = world.npc_memories.get(event.actor_id)
+        if memories is not None:
+            memories.pop(event.memory_id, None)
+            if not memories:
+                world.npc_memories.pop(event.actor_id, None)
+    elif isinstance(event, AiProposalEvaluatedEvent | AiProposalActivatedEvent):
+        record = event.record.model_copy(deep=True)
+        world.ai_proposals[record.id] = record
 
     world.rng_counters.clear()
     world.rng_counters.update(event.rng_counters_after)
