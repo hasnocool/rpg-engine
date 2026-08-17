@@ -20,11 +20,7 @@ def apply_event(world: WorldState, event: Event) -> None:
         world.entities[event.entity.id] = event.entity.model_copy(deep=True)
     elif isinstance(event, ActorMovedEvent):
         world.entities[event.actor_id].position = event.position.model_copy(deep=True)
-    elif isinstance(event, DamageAppliedEvent):
-        health = world.entities[event.target_id].health
-        if health is not None:
-            health.current = event.hp_after
-    elif isinstance(event, HealingAppliedEvent):
+    elif isinstance(event, (DamageAppliedEvent, HealingAppliedEvent)):
         health = world.entities[event.target_id].health
         if health is not None:
             health.current = event.hp_after
