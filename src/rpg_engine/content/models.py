@@ -35,7 +35,7 @@ class ContentRegistry(StrictModel):
     effects: dict[str, EffectSpec] = Field(default_factory=dict)
 
     @classmethod
-    def with_core_defaults(cls) -> "ContentRegistry":
+    def with_core_defaults(cls) -> ContentRegistry:
         return cls(
             weapons={
                 "unarmed": WeaponSpec(
