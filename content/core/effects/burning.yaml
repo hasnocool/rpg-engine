@@ -1,5 +1,11 @@
 id: burning
 name: Burning
+action_cost: action
+duration_turns: 2
+expires_on: end
+targeting:
+  shape: single
+  max_range: 30
 operations:
   - type: damage
     amount: 1d6

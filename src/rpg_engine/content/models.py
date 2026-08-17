@@ -6,7 +6,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from rpg_engine.models import StrictModel, WeaponSpec
+from rpg_engine.models import ActionKind, StrictModel, WeaponSpec
+from rpg_engine.spatial import TargetingContract
 
 
 class EffectOperation(StrictModel):
@@ -20,6 +21,12 @@ class EffectSpec(StrictModel):
     id: str
     name: str
     operations: list[EffectOperation] = Field(default_factory=list)
+    action_cost: ActionKind | None = ActionKind.ACTION
+    duration_turns: int | None = Field(default=None, ge=1)
+    expires_on: Literal["start", "end"] = "end"
+    concentration: bool = False
+    resource_costs: dict[str, int] = Field(default_factory=dict)
+    targeting: TargetingContract = Field(default_factory=TargetingContract)
 
 
 class ContentManifest(StrictModel):

@@ -1,0 +1,15 @@
+id: focus_guard
+name: Focus Guard
+action_cost: bonus_action
+duration_turns: 3
+expires_on: end
+concentration: true
+resource_costs:
+  focus: 1
+targeting:
+  shape: single
+  max_range: 0
+  include_source: true
+operations:
+  - type: add_condition
+    condition: focused

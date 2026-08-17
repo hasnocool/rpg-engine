@@ -1,5 +1,9 @@
 id: lesser_heal
 name: Lesser Heal
+action_cost: action
+targeting:
+  shape: single
+  max_range: 5
 operations:
   - type: heal
     amount: 1d8 + 2
