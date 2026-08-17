@@ -1,0 +1,12 @@
+id: fire_burst
+name: Fire Burst
+action_cost: action
+targeting:
+  shape: radius
+  max_range: 60
+  radius: 10
+  include_source: false
+operations:
+  - type: damage
+    amount: 2d6
+    damage_type: fire

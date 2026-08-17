@@ -28,6 +28,15 @@ class RollCheckCommand(StrictModel):
     stream: str | None = None
 
 
+class RollSavingThrowCommand(StrictModel):
+    type: Literal["roll_saving_throw"] = "roll_saving_throw"
+    actor_id: str
+    ability: Ability
+    dc: int
+    source_id: str | None = None
+    stream: str | None = None
+
+
 class AttackTargetCommand(StrictModel):
     type: Literal["attack_target"] = "attack_target"
     attacker_id: str
@@ -42,6 +51,25 @@ class ApplyEffectCommand(StrictModel):
     source_id: str | None = None
 
 
+class ApplyAreaEffectCommand(StrictModel):
+    type: Literal["apply_area_effect"] = "apply_area_effect"
+    effect_id: str
+    source_id: str | None = None
+    origin: Position | None = None
+    candidate_ids: list[str] | None = None
+
+
+class StartEncounterCommand(StrictModel):
+    type: Literal["start_encounter"] = "start_encounter"
+    encounter_id: str
+    participant_ids: list[str] = Field(min_length=2)
+
+
+class EndEncounterCommand(StrictModel):
+    type: Literal["end_encounter"] = "end_encounter"
+    encounter_id: str
+
+
 class AdvanceTimeCommand(StrictModel):
     type: Literal["advance_time"] = "advance_time"
     minutes: int = Field(gt=0, le=60 * 24 * 365)
@@ -50,20 +78,33 @@ class AdvanceTimeCommand(StrictModel):
 class EndTurnCommand(StrictModel):
     type: Literal["end_turn"] = "end_turn"
     actor_id: str
+    encounter_id: str | None = None
+
+
+class UseReactionCommand(StrictModel):
+    type: Literal["use_reaction"] = "use_reaction"
+    actor_id: str
+    trigger_id: str
+    reaction_id: str
 
 
 Command = Annotated[
     CreateEntityCommand
     | MoveActorCommand
     | RollCheckCommand
+    | RollSavingThrowCommand
     | AttackTargetCommand
     | ApplyEffectCommand
+    | ApplyAreaEffectCommand
+    | StartEncounterCommand
+    | EndEncounterCommand
     | AdvanceTimeCommand
-    | EndTurnCommand,
+    | EndTurnCommand
+    | UseReactionCommand,
     Field(discriminator="type"),
 ]
 
-COMMAND_ADAPTER = TypeAdapter(Command)
+COMMAND_ADAPTER: TypeAdapter[Command] = TypeAdapter(Command)
 
 
 def parse_command(payload: object) -> Command:

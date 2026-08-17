@@ -7,6 +7,7 @@ from collections import defaultdict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -18,6 +19,11 @@ from rpg_engine.events import Event
 from rpg_engine.models import WorldState
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+_app_state_service: CampaignService | None = None
 
 
 class CampaignCreateRequest(BaseModel):
@@ -80,7 +86,9 @@ def create_app(
         content = None
         if content_path is not None:
             content = await load_content_pack_async(Path(content_path))
-        app.state.service = CampaignService(store, content=content)
+        global _app_state_service
+        _app_state_service = CampaignService(store, content=content)
+        app.state.service = _app_state_service
         yield
 
     app = FastAPI(
@@ -91,7 +99,8 @@ def create_app(
     )
 
     def service() -> CampaignService:
-        return app.state.service
+        assert _app_state_service is not None
+        return _app_state_service
 
     @app.get("/health")
     async def health() -> dict[str, str]:

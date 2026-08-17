@@ -2,50 +2,71 @@
 
 A **headless, deterministic, event-driven tabletop RPG simulation engine** for Python 3.12+.
 
-The engine deliberately separates authoritative game state from presentation. A terminal client,
-web app, Discord bot, 2D renderer, 3D renderer, AI narrator, or multiplayer server can all issue
-the same commands and consume the same events without owning game rules.
+The authoritative simulation is presentation-agnostic. CLI, TUI, web, Discord, 2D, 3D, AI, and
+multiplayer clients issue the same commands and consume the same immutable events.
 
 > The built-in `d20` runtime is a generic example ruleset. This repository does not bundle
 > proprietary tabletop rulebooks or copyrighted game content. Licensed, SRD-compatible, original,
-> or homebrew content should live in separate content packs/ruleset plugins.
+> or homebrew rules/content belong in separate ruleset plugins and content packs.
+
+## Current milestone: v0.2 Tactical RPG
+
+v0.2 builds a tactical authority layer on the deterministic v0.1 core:
+
+- persisted encounter aggregates with deterministic initiative ordering
+- round/turn cursor and authoritative active-actor validation
+- action, bonus-action, reaction, and movement budgets
+- typed d20 resolution contexts/outcomes
+- modifier pipelines with source/provenance audit trails
+- saving throws
+- trigger/reaction hook contracts and persisted reaction windows
+- generic resource pools and concentration state
+- resistance, immunity, and vulnerability damage transforms
+- timed effects with deterministic expiry
+- single-target and area-targeting contracts
+- grid and graph spatial adapter interfaces
+- event-replay reconstruction of tactical state
+- v0.1 command compatibility outside active encounters
+
+The engine still knows nothing about pixels, meshes, terminal colors, WebGL, cameras, or input
+devices.
 
 ## Architecture
 
 ```text
-Clients (CLI / TUI / Web / 2D / 3D / AI)
-                    |
-                 Commands
-                    v
-          +-------------------+
-          | SimulationEngine  |
-          | validation/rules  |
-          | effects/state/RNG |
-          +---------+---------+
-                    |
-                  Events
-                    v
-       +------------+-------------+
-       | persistence / websocket  |
-       | replay / UI / analytics  |
-       +--------------------------+
+Human / AI / Client
+        |
+      Command
+        v
++---------------------------+
+| CampaignService           | async per-campaign authority
+| +-----------------------+ |
+| | SimulationEngine      | |
+| | encounters / rules    | |
+| | effects / hooks / RNG | |
+| +-----------+-----------+ |
++-------------|-------------+
+              | Events
+      +-------+---------+
+      |                 |
+ SQLite/event log   WebSocket/UI
 ```
 
-The current v0.1 foundation includes:
+Rules and geometry remain replaceable contracts:
 
-- strict Pydantic command/event contracts
-- deterministic named RNG streams whose counters are persisted in world state
-- component-oriented entities (`Identity`, `Stats`, `Health`, `Position`, `Inventory`, conditions)
-- a pluggable `RulesRuntime` interface with a generic d20 implementation
-- data-driven YAML weapons and composable effect definitions
-- attack/check/movement/effect/time commands
-- immutable combat, damage, healing, condition, movement, and time events
-- event reducers for reconstruction between snapshots
-- async SQLite persistence using WAL mode and `aiosqlite`
-- per-campaign async locks to serialize authoritative mutations safely
-- FastAPI REST endpoints and WebSocket command/event transport
-- a Typer CLI and deterministic combat demo
-- CI across Python 3.12 and 3.13
+```text
+SimulationEngine
+  |- RulesRuntime
+  |    |- d20 reference runtime
+  |    `- custom rulesets
+  |
+  |- SpatialAdapter
+  |    |- GridSpatialAdapter
+  |    `- GraphSpatialAdapter
+  |
+  `- HookRegistry
+       `- ruleset/content reaction hooks
+```
 
 ## Install
 
@@ -55,48 +76,26 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-## Run the deterministic demo
+## Run
 
 ```bash
 rpg-engine demo --seed 918392482
-```
-
-The same seed and command sequence produce the same dice results and state transitions.
-
-## Run the authoritative API
-
-```bash
 rpg-engine serve --host 127.0.0.1 --port 8000
 ```
 
-Create a campaign:
+## Tactical command examples
 
-```bash
-curl -X POST http://127.0.0.1:8000/campaigns \
-  -H 'content-type: application/json' \
-  -d '{"seed":918392482,"campaign_id":"demo"}'
+Start an encounter:
+
+```json
+{
+  "type": "start_encounter",
+  "encounter_id": "bridge-fight",
+  "participant_ids": ["fighter-1", "goblin-1"]
+}
 ```
 
-Create an actor:
-
-```bash
-curl -X POST http://127.0.0.1:8000/campaigns/demo/commands \
-  -H 'content-type: application/json' \
-  -d '{
-    "type":"create_entity",
-    "entity":{
-      "id":"fighter-1",
-      "identity":{"name":"Aric","tags":["hero"]},
-      "stats":{"strength":16,"armor_class":16},
-      "health":{"current":24,"maximum":24},
-      "position":{},
-      "inventory":{},
-      "conditions":[]
-    }
-  }'
-```
-
-Issue an attack command after adding a target:
+Attack on the active turn:
 
 ```json
 {
@@ -107,51 +106,98 @@ Issue an attack command after adding a target:
 }
 ```
 
-Clients can also connect to:
+Roll a saving throw:
 
-```text
-ws://127.0.0.1:8000/campaigns/{campaign_id}/ws
+```json
+{
+  "type": "roll_saving_throw",
+  "actor_id": "fighter-1",
+  "ability": "dexterity",
+  "dc": 13,
+  "source_id": "trap-1"
+}
 ```
 
-and send the same command JSON. Emitted events are broadcast to connected campaign clients.
+End the current turn:
 
-## Core design rules
+```json
+{
+  "type": "end_turn",
+  "actor_id": "fighter-1",
+  "encounter_id": "bridge-fight"
+}
+```
 
-1. **The simulation core knows nothing about rendering.** No pixels, HTML, meshes, sprites,
-   terminal colors, cameras, or controller input exist in the domain layer.
-2. **Commands request; events record.** Players, humans, AIs, and remote clients can only request
-   actions through commands.
-3. **Rulesets answer mechanical questions.** Edition/system-specific math belongs behind
-   `RulesRuntime`, not scattered through transport or rendering code.
-4. **Content is data.** Items/effects are YAML now; creatures, spells, quests, dialogue, factions,
-   maps, and schedules will follow the same model.
-5. **RNG is explicit state.** Randomness is never drawn from Python's process-global PRNG.
-6. **Persistence is append-first.** Events are authoritative history; snapshots accelerate load.
-7. **Concurrency is serialized per campaign.** Concurrent clients cannot interleave state mutation.
-8. **Narrators describe reality; they do not invent authoritative state.** Future LLM integration
-   consumes observations/events and returns commands or prose, never direct state mutations.
+The same payloads work through REST or the campaign WebSocket command channel.
+
+## Determinism
+
+Randomness uses named counter-based streams:
+
+```text
+campaign seed + stream name + stream counter -> deterministic roll
+```
+
+The counters are state, and events preserve post-command counter state. Snapshot + event replay
+therefore restores both the visible world and the future RNG position.
+
+Initiative ordering is deterministic too: total descending, modifier descending, actor ID ascending.
+
+## Tactical authority
+
+Inside an active encounter:
+
+- only the active actor may spend action, bonus-action, or movement budget
+- reactions may be spent out of turn only from an authoritative reaction window
+- weapon/effect range is validated by the configured spatial adapter
+- movement cost is computed by the spatial adapter, never trusted from the client
+- resource costs are checked and spent atomically before effects resolve
+- damage traits are applied before HP mutation
+- timed effects and concentration are stateful and event-sourced
+
+Outside an encounter, v0.1 commands remain usable without tactical budget requirements.
+
+## Content remains data-driven
+
+v0.2 content schemas support:
+
+```yaml
+id: focus_guard
+name: Focus Guard
+action_cost: bonus_action
+duration_turns: 3
+concentration: true
+resource_costs:
+  focus: 1
+targeting:
+  shape: single
+  max_range: 0
+operations:
+  - type: add_condition
+    condition: focused
+```
+
+Area effects use the same effect pipeline with a targeting contract rather than renderer geometry.
 
 ## Repository layout
 
 ```text
 src/rpg_engine/
-├── api/              # FastAPI + WebSocket adapter
-├── content/          # content schemas/loaders
-├── persistence/      # event/snapshot stores
-├── rules/            # ruleset interface + generic d20 runtime
-├── commands.py       # intent contracts
-├── dice.py           # deterministic named RNG streams
-├── effects.py        # composable effect pipeline
-├── engine.py         # authoritative command processor
-├── events.py         # immutable facts
-├── models.py         # entities/components/world state
-├── reducer.py        # event reconstruction
-├── service.py        # async concurrency/persistence boundary
-└── cli.py            # text adapter
-
-content/core/         # original example content pack
-docs/                 # architecture and roadmap
-tests/                # deterministic/core/persistence/API tests
+|- api/              # FastAPI + WebSocket adapter
+|- content/          # data-driven content schemas/loaders
+|- persistence/      # async event/snapshot storage
+|- rules/            # ruleset interface + generic d20 runtime
+|- commands.py       # intent contracts
+|- events.py         # immutable facts
+|- models.py         # world/entity/encounter state
+|- resolution.py     # modifier pipeline + typed outcomes
+|- spatial.py        # grid/graph targeting/movement contracts
+|- hooks.py          # trigger/reaction extension contracts
+|- effects.py        # composable effect execution
+|- engine.py         # authoritative processor
+|- reducer.py        # replay reconstruction
+|- service.py        # async concurrency/persistence boundary
+`- cli.py            # text adapter
 ```
 
 ## Test
@@ -161,8 +207,8 @@ ruff check .
 pytest --cov=rpg_engine --cov-report=term-missing
 ```
 
-## Roadmap
+## Next milestone
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md). The next major milestone is **v0.2 Tactical RPG**:
-encounters, initiative, action economy, reactions, conditions/hooks, richer effect targeting,
-and spatial adapters without coupling the simulation to a renderer.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md). The next milestone is **v0.3 Adventure Engine**:
+graph-based world transitions, exploration/discovery, inventory containers/equipment, dialogue,
+quests, merchants, NPC templates, and travel.
