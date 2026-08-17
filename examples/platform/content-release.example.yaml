@@ -1,0 +1,10 @@
+pack_id: community-example
+name: Community Example
+version: 1.0.0
+engine: ">=1,<2"
+ruleset: d20
+download_url: https://example.invalid/community-example-1.0.0.zip
+sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+license: CC0-1.0
+tags: [example]
+dependencies: []

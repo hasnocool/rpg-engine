@@ -16,25 +16,25 @@ class ExamplePlugin:
         id="example",
         name="Example",
         version="1.2.0",
-        engine=">=0.9,<1.0",
+        engine=">=1,<2",
     )
 
     def create_runtime(self) -> D20RulesRuntime:
         return D20RulesRuntime()
 
 
-def test_rules_plugin_registry_validates_and_instantiates() -> None:
-    registry = RulesPluginRegistry(engine_version="0.9.0")
+def test_rules_plugin_registry_validates_v1_plugins() -> None:
+    registry = RulesPluginRegistry(engine_version="1.0.0")
     registry.register(BuiltinD20RulesPlugin())
     registry.register(ExamplePlugin())
 
-    assert registry.versions == {"d20": "0.9.0", "example": "1.2.0"}
+    assert registry.versions == {"d20": "1.0.0", "example": "1.2.0"}
     assert isinstance(registry.runtime("example"), D20RulesRuntime)
     registry.validate_requirements([VersionRequirement(id="example", version=">=1,<2")])
 
 
 def test_rules_plugin_registry_rejects_bad_api_and_duplicates() -> None:
-    registry = RulesPluginRegistry(engine_version="0.9.0")
+    registry = RulesPluginRegistry(engine_version="1.0.0")
     registry.register(ExamplePlugin())
 
     with pytest.raises(ValueError, match="duplicate"):
@@ -46,7 +46,7 @@ def test_rules_plugin_registry_rejects_bad_api_and_duplicates() -> None:
             name="Bad",
             version="1.0.0",
             api_version="99",
-            engine=">=0.9,<1.0",
+            engine=">=1,<2",
         )
 
         def create_runtime(self) -> D20RulesRuntime:

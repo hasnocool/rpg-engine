@@ -1,4 +1,4 @@
-"""Rules plugin SDK and entry-point discovery for v0.9 creator packages."""
+"""Stable rules plugin SDK for rpg-engine 1.x."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class RulesPluginDescriptor(StrictModel):
     name: str
     version: str
     api_version: str = RULES_PLUGIN_API_VERSION
-    engine: str = ">=0.9,<1.0"
+    engine: str = ">=1,<2"
     description: str = ""
 
 
@@ -38,8 +38,8 @@ class BuiltinD20RulesPlugin:
     descriptor: ClassVar[RulesPluginDescriptor] = RulesPluginDescriptor(
         id="d20",
         name="Built-in generic d20 rules",
-        version="0.9.0",
-        engine=">=0.9,<1.0",
+        version="1.0.0",
+        engine=">=1,<2",
         description="Reference generic d20 runtime shipped with rpg-engine.",
     )
 
@@ -48,7 +48,7 @@ class BuiltinD20RulesPlugin:
 
 
 class RulesPluginRegistry:
-    """Validated rules-plugin catalog with deterministic IDs and versions."""
+    """Validated plugin catalog covered by the stable rules API v1 contract."""
 
     def __init__(self, *, engine_version: str = __version__) -> None:
         self.engine_version = engine_version
@@ -109,8 +109,6 @@ class RulesPluginRegistry:
             )
 
     def discover(self, *, include_builtin: bool = True) -> RulesPluginRegistry:
-        """Load installed plugins through the stable Python entry-point group."""
-
         if include_builtin and "d20" not in self._plugins:
             self.register(BuiltinD20RulesPlugin())
         entry_points = metadata.entry_points().select(group=RULES_PLUGIN_ENTRY_POINT)
@@ -132,7 +130,5 @@ async def discover_rules_plugins_async(
     engine_version: str = __version__,
     include_builtin: bool = True,
 ) -> RulesPluginRegistry:
-    """Discover plugins off the event loop because entry-point imports may perform file I/O."""
-
     registry = RulesPluginRegistry(engine_version=engine_version)
     return await asyncio.to_thread(registry.discover, include_builtin=include_builtin)

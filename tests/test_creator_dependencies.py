@@ -13,7 +13,7 @@ def _pack(
     *,
     dependencies: list[dict[str, object]] | None = None,
     rules_plugins: list[dict[str, object]] | None = None,
-    engine: str = ">=0.9,<1.0",
+    engine: str = ">=1,<2",
 ) -> Path:
     root.mkdir()
     (root / "manifest.yaml").write_text(
@@ -37,16 +37,14 @@ def _pack(
 
 
 def test_dependency_resolution_orders_dependencies_first(tmp_path: Path) -> None:
-    core = _pack(tmp_path / "core", "core", "0.9.0")
+    core = _pack(tmp_path / "core", "core", "1.0.0")
     addon = _pack(
         tmp_path / "addon",
         "addon",
         "1.2.0",
-        dependencies=[{"id": "core", "version": ">=0.9,<1.0"}],
+        dependencies=[{"id": "core", "version": ">=1,<2"}],
     )
-
     result = resolve_dependencies([addon, core], requested_ids=["addon"])
-
     assert result.order == ["core", "addon"]
     assert result.roots_in_load_order == [core.resolve(), addon.resolve()]
 
@@ -57,9 +55,8 @@ def test_dependency_resolution_rejects_version_mismatch(tmp_path: Path) -> None:
         tmp_path / "addon",
         "addon",
         "1.0.0",
-        dependencies=[{"id": "core", "version": ">=0.9"}],
+        dependencies=[{"id": "core", "version": ">=1"}],
     )
-
     with pytest.raises(ValueError, match="does not satisfy"):
         resolve_dependencies([core, addon], requested_ids=["addon"])
 
@@ -77,7 +74,6 @@ def test_dependency_resolution_rejects_cycles(tmp_path: Path) -> None:
         "1.0.0",
         dependencies=[{"id": "alpha", "version": "*"}],
     )
-
     with pytest.raises(ValueError, match="dependency cycle"):
         resolve_dependencies([alpha, beta], requested_ids=["alpha"])
 
@@ -89,10 +85,8 @@ def test_rules_plugin_requirements_are_checked(tmp_path: Path) -> None:
         "1.0.0",
         rules_plugins=[{"id": "my_rules", "version": ">=2,<3"}],
     )
-
     with pytest.raises(ValueError, match="requires rules plugin"):
         resolve_dependencies([addon], requested_ids=["addon"])
-
     resolved = resolve_dependencies(
         [addon],
         requested_ids=["addon"],
