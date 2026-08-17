@@ -1,0 +1,5 @@
+id: lesser_heal
+name: Lesser Heal
+operations:
+  - type: heal
+    amount: 1d8 + 2

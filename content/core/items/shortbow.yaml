@@ -1,0 +1,8 @@
+id: shortbow
+name: Shortbow
+ability: dexterity
+damage: 1d6
+damage_type: piercing
+attack_bonus: 0
+damage_bonus: 0
+range: 80
