@@ -1,0 +1,8 @@
+id: longsword
+name: Longsword
+ability: strength
+damage: 1d8
+damage_type: slashing
+attack_bonus: 0
+damage_bonus: 0
+range: 5

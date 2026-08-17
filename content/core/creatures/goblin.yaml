@@ -1,0 +1,19 @@
+id: goblin
+identity:
+  name: Goblin
+  tags: [humanoid, monster]
+stats:
+  strength: 8
+  dexterity: 14
+  constitution: 10
+  intelligence: 10
+  wisdom: 8
+  charisma: 8
+  proficiency_bonus: 2
+  armor_class: 13
+health:
+  current: 11
+  maximum: 11
+inventory:
+  item_ids: [shortbow]
+  equipped_item_ids: [shortbow]
