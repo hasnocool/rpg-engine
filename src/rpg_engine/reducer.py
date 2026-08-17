@@ -94,7 +94,7 @@ def apply_event(world: WorldState, event: Event) -> None:
         actor.inventory.currency = dict(event.actor_currency_after)
         container.item_ids = list(event.container_item_ids_after)
         container.currency = dict(event.container_currency_after)
-    elif isinstance(event, (ItemEquippedEvent, ItemUnequippedEvent)):
+    elif isinstance(event, ItemEquippedEvent | ItemUnequippedEvent):
         inventory = world.entities[event.actor_id].inventory
         inventory.equipment = dict(event.equipment_after)
         inventory.equipped_item_ids = list(event.equipped_item_ids_after)
@@ -126,7 +126,7 @@ def apply_event(world: WorldState, event: Event) -> None:
         seller.inventory.currency[event.currency] = event.seller_balance_after
     elif isinstance(event, ActorMovedEvent):
         world.entities[event.actor_id].position = event.position.model_copy(deep=True)
-    elif isinstance(event, (DamageAppliedEvent, HealingAppliedEvent)):
+    elif isinstance(event, DamageAppliedEvent | HealingAppliedEvent):
         health = world.entities[event.target_id].health
         if health is not None:
             health.current = event.hp_after
@@ -152,6 +152,28 @@ def apply_event(world: WorldState, event: Event) -> None:
         encounter.round = event.round
         encounter.turn_index = event.turn_index
         encounter.budgets[event.actor_id] = event.budget.model_copy(deep=True)
+    elif isinstance(event, TimelineConfiguredEvent):
+        world.timeline.mode = event.mode
+        world.timeline.turn_quantum_ms = event.turn_quantum_ms
+        world.timeline.turn_timeout_ms = event.turn_timeout_ms
+        world.timeline.paused = event.paused
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+    elif isinstance(event, TimelineAdvancedEvent):
+        world.timeline.now_ms = event.now_ms
+        world.time_minutes = event.now_ms // 60_000
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+    elif isinstance(event, TimelineItemScheduledEvent):
+        world.timeline.queue[event.item.id] = event.item.model_copy(deep=True)
+        world.timeline.next_order = max(world.timeline.next_order, event.item.order + 1)
+    elif isinstance(event, TimelineItemFiredEvent):
+        world.timeline.queue.pop(event.item.id, None)
+        if event.rescheduled_item is not None:
+            item = event.rescheduled_item.model_copy(deep=True)
+            world.timeline.queue[item.id] = item
+    elif isinstance(event, TimelineItemCancelledEvent):
+        world.timeline.queue.pop(event.item_id, None)
+    elif isinstance(event, TimelinePauseChangedEvent):
+        world.timeline.paused = event.paused
     elif isinstance(event, ActionBudgetSpentEvent):
         budget = world.encounters[event.encounter_id].budgets[event.actor_id]
         setattr(budget, event.budget_kind, event.remaining)
@@ -243,7 +265,7 @@ def apply_event(world: WorldState, event: Event) -> None:
         ] = event.current
     elif isinstance(event, ReputationChangedEvent):
         world.reputation.setdefault(event.actor_id, {})[event.faction_id] = event.current
-    elif isinstance(event, (SettlementInitializedEvent, SettlementEconomyTickedEvent)):
+    elif isinstance(event, SettlementInitializedEvent | SettlementEconomyTickedEvent):
         world.settlements[event.settlement.id] = event.settlement.model_copy(deep=True)
     elif isinstance(event, OffscreenEncounterResolvedEvent):
         record = event.record.model_copy(deep=True)
@@ -254,7 +276,7 @@ def apply_event(world: WorldState, event: Event) -> None:
                 actor.health.current = hp_after
     elif isinstance(event, RumorGeneratedEvent):
         world.rumors[event.rumor.id] = event.rumor.model_copy(deep=True)
-    elif isinstance(event, (DynamicQuestGeneratedEvent, DynamicQuestUpdatedEvent)):
+    elif isinstance(event, DynamicQuestGeneratedEvent | DynamicQuestUpdatedEvent):
         world.dynamic_quests[event.quest.id] = event.quest.model_copy(deep=True)
         if (
             isinstance(event, DynamicQuestUpdatedEvent)

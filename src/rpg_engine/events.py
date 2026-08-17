@@ -405,10 +405,13 @@ class TimelineItemCancelledEvent(EventBase):
 class TimelineAdvancedEvent(EventBase):
     type: Literal["timeline_advanced"] = "timeline_advanced"
     source: TimelineAdvanceSource
+    previous_ms: int
+    now_ms: int
     delta_ms: int
-    time_ms: int
+    firings: int
+    backlog: bool
     wall_clock_anchor_ms: int | None = None
-    backlog: bool = False
+    time_ms: int  # kept for backward compatibility
 
 
 class TimelineItemFiredEvent(EventBase):
@@ -614,7 +617,7 @@ Event = Annotated[
     Field(discriminator="type"),
 ]
 
-EVENT_ADAPTER = TypeAdapter(Event)
+EVENT_ADAPTER: TypeAdapter[Event] = TypeAdapter(Event)
 
 
 def parse_event(payload: object) -> Event:

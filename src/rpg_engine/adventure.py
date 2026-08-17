@@ -85,21 +85,19 @@ class AdventureRuntime:
     def handles(command: Command) -> bool:
         return isinstance(
             command,
-            (
-                SpawnNpcCommand,
-                ExploreLocationCommand,
-                SearchLocationCommand,
-                TravelCommand,
-                LootContainerCommand,
-                EquipItemCommand,
-                UnequipItemCommand,
-                StartDialogueCommand,
-                ChooseDialogueOptionCommand,
-                StartQuestCommand,
-                AdvanceQuestCommand,
-                BuyItemCommand,
-                SellItemCommand,
-            ),
+            SpawnNpcCommand
+            | ExploreLocationCommand
+            | SearchLocationCommand
+            | TravelCommand
+            | LootContainerCommand
+            | EquipItemCommand
+            | UnequipItemCommand
+            | StartDialogueCommand
+            | ChooseDialogueOptionCommand
+            | StartQuestCommand
+            | AdvanceQuestCommand
+            | BuyItemCommand
+            | SellItemCommand,
         )
 
     def _entity(self, entity_id: str) -> Entity:
@@ -360,7 +358,7 @@ class AdventureRuntime:
                     item_id=previous,
                     slot=item.equip_slot,
                     equipment_after=dict(actor.inventory.equipment),
-                    equicped_item_ids_after=list(actor.inventory.equipped_item_ids),
+                    equipped_item_ids_after=list(actor.inventory.equipped_item_ids),
                 )
             )
         actor.inventory.equipment[item.equip_slot] = item.id
