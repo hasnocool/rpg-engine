@@ -49,7 +49,7 @@ def test_public_platform_api_and_download_redirects(tmp_path: Path) -> None:
     with TestClient(app) as client:
         info = client.get("/v1/platform")
         assert info.status_code == 200
-        assert info.json()["engine_version"] == "1.0.0"
+        assert info.json()["engine_version"] == "1.0.2"
 
         contracts = client.get("/v1/contracts")
         assert contracts.json()["engine_api"] == "1.0"

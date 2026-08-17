@@ -49,7 +49,7 @@ from rpg_engine.timeline import (
 
 
 class SimulationEngine(TacticalSimulationEngine):
-    """v0.1-v0.4 authority composed from tactical, adventure, timeline, and living domains."""
+    """Authoritative tactical, adventure, timeline, living-world, and AI runtime."""
 
     def __init__(
         self,
@@ -91,7 +91,10 @@ class SimulationEngine(TacticalSimulationEngine):
         events: list[EventBase] = [
             TimelineAdvancedEvent(
                 source=result.source,
+                previous_ms=result.previous_ms,
+                now_ms=result.now_ms,
                 delta_ms=result.delta_ms,
+                firings=len(result.fired),
                 time_ms=result.now_ms,
                 wall_clock_anchor_ms=result.wall_clock_anchor_ms,
                 backlog=result.backlog,
@@ -258,13 +261,7 @@ class SimulationEngine(TacticalSimulationEngine):
 
     def _post_tactical_timeline(self, command: Command) -> list[EventBase]:
         raw_events: list[EventBase] = []
-        if isinstance(command, AdvanceTimeCommand):
-            raw_events.extend(
-                self._advance_events(
-                    self.timeline.advance_legacy_world_time(command.minutes)
-                )
-            )
-        elif isinstance(command, StartEncounterCommand):
+        if isinstance(command, StartEncounterCommand):
             raw_events.extend(
                 self._schedule_turn_signals(command.encounter_id, advance_turn=False)
             )
@@ -279,6 +276,13 @@ class SimulationEngine(TacticalSimulationEngine):
         timeline_events = self._execute_timeline_command(command)
         if timeline_events is not None:
             return timeline_events
+
+        if isinstance(command, AdvanceTimeCommand):
+            try:
+                result = self.timeline.advance_legacy_world_time(command.minutes)
+            except TimelineError as exc:
+                raise SimulationError(str(exc)) from exc
+            return self._stamp_domain(self._advance_events(result))
 
         if AIGameMasterRuntime.handles(command):
             try:
