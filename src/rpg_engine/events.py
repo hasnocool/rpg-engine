@@ -17,7 +17,7 @@ from rpg_engine.models import (
     StrictModel,
 )
 from rpg_engine.resolution import Modifier
-from rpg_engine.timeline import TimeMode, TimelineAdvanceSource, TimelineItem
+from rpg_engine.timeline import TimelineAdvanceSource, TimelineItem, TimeMode
 
 
 class EventBase(StrictModel):

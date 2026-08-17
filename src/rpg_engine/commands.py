@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import Field, TypeAdapter, model_validator
 
 from rpg_engine.models import Ability, Entity, Position, StrictModel
-from rpg_engine.timeline import TimeMode, TimelineItemKind, TimelinePayload
+from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):

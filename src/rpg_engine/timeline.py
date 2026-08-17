@@ -8,7 +8,6 @@ from typing import Protocol, TypedDict, Unpack
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 type TimelinePayloadValue = str | int | float | bool | None
 type TimelinePayload = dict[str, TimelinePayloadValue]
 
@@ -335,9 +334,13 @@ class TimelineScheduler:
                     if current.remaining_occurrences is None
                     else current.remaining_occurrences - 1
                 )
+                interval = current.interval_ms
+                if interval is None:
+                    # Should not happen due to validator, but guard for type checker
+                    interval = 0
                 rescheduled = current.model_copy(
                     update={
-                        "due_ms": current.due_ms + current.interval_ms,
+                        "due_ms": current.due_ms + interval,
                         "remaining_occurrences": remaining,
                     },
                     deep=True,

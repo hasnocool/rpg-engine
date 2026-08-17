@@ -19,12 +19,12 @@ from rpg_engine.models import Entity, Identity, WorldState
 from rpg_engine.reducer import apply_event
 from rpg_engine.temporal import TimelineSimulationEngine
 from rpg_engine.timeline import (
-    TimeMode,
     TimelineAdvanceSource,
     TimelineError,
     TimelineItemKind,
     TimelineScheduler,
     TimelineState,
+    TimeMode,
 )
 
 

@@ -36,6 +36,7 @@ from rpg_engine.timeline import (
     TimelineAdvanceResult,
     TimelineAdvanceSource,
     TimelineError,
+    TimelineItem,
     TimelineItemKind,
     TimelineScheduler,
 )
@@ -172,8 +173,8 @@ class TimelineSimulationEngine(SimulationEngine):
                 return self._stamp_timeline([TimelineItemScheduledEvent(item=item)])
 
             if isinstance(command, CancelTimelineItemCommand):
-                item = self.timeline.cancel(command.item_id)
-                if item is None:
+                cancelled_item: TimelineItem | None = self.timeline.cancel(command.item_id)
+                if cancelled_item is None:
                     raise TimelineError(f"unknown timeline item: {command.item_id}")
                 return self._stamp_timeline(
                     [TimelineItemCancelledEvent(item_id=command.item_id)]
