@@ -23,6 +23,7 @@ from rpg_engine.content.models import ContentRegistry
 from rpg_engine.events import (
     Event,
     EventBase,
+    TimeAdvancedEvent,
     TimelineAdvancedEvent,
     TimelineConfiguredEvent,
     TimelineItemCancelledEvent,
@@ -282,7 +283,14 @@ class SimulationEngine(TacticalSimulationEngine):
                 result = self.timeline.advance_legacy_world_time(command.minutes)
             except TimelineError as exc:
                 raise SimulationError(str(exc)) from exc
-            return self._stamp_domain(self._advance_events(result))
+            raw_events: list[EventBase] = [
+                TimeAdvancedEvent(
+                    minutes=command.minutes,
+                    time_minutes=self.world.time_minutes,
+                )
+            ]
+            raw_events.extend(self._advance_events(result))
+            return self._stamp_domain(raw_events)
 
         if AIGameMasterRuntime.handles(command):
             try:
