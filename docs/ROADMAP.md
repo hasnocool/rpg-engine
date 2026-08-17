@@ -16,7 +16,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - REST/WebSocket adapter
 - CLI demo and CI
 
-## v0.2 — Tactical RPG
+## v0.2 — Tactical RPG (implemented)
 
 - encounter aggregate
 - deterministic initiative order
@@ -31,8 +31,10 @@ The project is intentionally staged so simulation depth is built before expensiv
 - effect durations and expiry
 - areas of effect and targeting contracts
 - grid/graph spatial adapter interfaces
+- tactical event replay coverage
+- v0.1 compatibility outside encounters
 
-## v0.3 — Adventure Engine
+## v0.3 — Adventure Engine (next)
 
 - graph-based world maps and transitions
 - exploration/search/discovery
@@ -119,8 +121,8 @@ rewind, branching timelines, and verification tools.
 
 ### Spatial authority
 
-Introduce graph, grid, and continuous-space adapters with occupancy, collision, pathfinding, line of
-sight, cover, terrain, and range semantics independent of rendering.
+v0.2 establishes grid/graph adapter contracts. Later milestones deepen these with occupancy, collision,
+pathfinding, line of sight, cover, terrain, and continuous-space semantics without renderer coupling.
 
 ### Intelligent living actors
 
