@@ -328,7 +328,7 @@ async def test_async_coordinator_serializes_same_actor_without_blocking_event_lo
     async def executor(campaign_id: str, command: object):
         nonlocal active, max_active
         assert campaign_id == "coord"
-        assert getattr(command, "type") == "explore_location"
+        assert command.type == "explore_location"
         active += 1
         max_active = max(max_active, active)
         await asyncio.sleep(0.01)

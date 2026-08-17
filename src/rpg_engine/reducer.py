@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from rpg_engine.events import (
     ActionBudgetSpentEvent,
+    ActorMovedEvent,
     AiProposalActivatedEvent,
     AiProposalEvaluatedEvent,
-    ActorMovedEvent,
     CalendarAdvancedEvent,
     ConcentrationEndedEvent,
     ConcentrationStartedEvent,
