@@ -13,7 +13,7 @@ def _pack(
     *,
     dependencies: list[dict[str, object]] | None = None,
     rules_plugins: list[dict[str, object]] | None = None,
-    engine: str = ">=0.9,<1.0",
+    engine: str = ">=0.9,<2.0",
 ) -> Path:
     root.mkdir()
     (root / "manifest.yaml").write_text(

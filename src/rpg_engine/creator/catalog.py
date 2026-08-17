@@ -10,6 +10,9 @@ from pydantic import BaseModel
 
 from rpg_engine.content.models import (
     CalendarSpec,
+    CharacterAncestrySpec,
+    CharacterBackgroundSpec,
+    CharacterClassSpec,
     ContainerTemplateSpec,
     DialogueSpec,
     DiscoverySpec,
@@ -180,6 +183,43 @@ def _resource_node(resource_id: str, name: str) -> dict[str, Any]:
     }
 
 
+def _ancestry(resource_id: str, name: str) -> dict[str, Any]:
+    return {
+        "id": resource_id,
+        "name": name,
+        "description": "",
+        "ability_bonuses": {},
+        "movement_speed": 30,
+        "tags": [],
+        "languages": [],
+    }
+
+
+def _character_class(resource_id: str, name: str) -> dict[str, Any]:
+    return {
+        "id": resource_id,
+        "name": name,
+        "description": "",
+        "hit_die": 8,
+        "primary_abilities": [],
+        "saving_throw_abilities": [],
+        "starting_item_ids": [],
+        "starting_currency": {},
+        "resource_pools": {},
+    }
+
+
+def _background(resource_id: str, name: str) -> dict[str, Any]:
+    return {
+        "id": resource_id,
+        "name": name,
+        "description": "",
+        "starting_item_ids": [],
+        "starting_currency": {},
+        "tags": [],
+    }
+
+
 RESOURCE_SPECS: tuple[CreatorResourceSpec, ...] = (
     CreatorResourceSpec("campaign", "campaigns", CampaignDraft, "Campaign", _campaign),
     CreatorResourceSpec(
@@ -234,6 +274,29 @@ RESOURCE_SPECS: tuple[CreatorResourceSpec, ...] = (
     CreatorResourceSpec("rumor", "rumors", RumorTemplateSpec, "Rumor", _rumor),
     CreatorResourceSpec(
         "resource_node", "ecology", ResourceNodeSpec, "Resource node", _resource_node
+    ),
+    CreatorResourceSpec(
+        "ancestry",
+        "characters/ancestries",
+        CharacterAncestrySpec,
+        "Character ancestry / race",
+        _ancestry,
+        aliases=("race",),
+    ),
+    CreatorResourceSpec(
+        "character_class",
+        "characters/classes",
+        CharacterClassSpec,
+        "Character class",
+        _character_class,
+        aliases=("class",),
+    ),
+    CreatorResourceSpec(
+        "background",
+        "characters/backgrounds",
+        CharacterBackgroundSpec,
+        "Character background",
+        _background,
     ),
 )
 

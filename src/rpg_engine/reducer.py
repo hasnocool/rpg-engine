@@ -8,6 +8,10 @@ from rpg_engine.events import (
     AiProposalActivatedEvent,
     AiProposalEvaluatedEvent,
     CalendarAdvancedEvent,
+    CharacterAbilitiesGeneratedEvent,
+    CharacterDraftCreatedEvent,
+    CharacterDraftUpdatedEvent,
+    CharacterFinalizedEvent,
     ConcentrationEndedEvent,
     ConcentrationStartedEvent,
     ConditionAddedEvent,
@@ -70,6 +74,20 @@ from rpg_engine.models import AdventureKnowledge, ConcentrationState, ReactionWi
 def apply_event(world: WorldState, event: Event) -> None:
     if isinstance(event, EntityCreatedEvent):
         world.entities[event.entity.id] = event.entity.model_copy(deep=True)
+    elif isinstance(event, CharacterDraftCreatedEvent | CharacterDraftUpdatedEvent):
+        draft = event.draft.model_copy(deep=True)
+        world.character_drafts[draft.id] = draft
+    elif isinstance(event, CharacterAbilitiesGeneratedEvent):
+        draft = world.character_drafts[event.draft_id]
+        draft.generated_method = event.method
+        draft.generated_ability_pool = list(event.score_pool)
+        draft.ability_generation_count = event.generation
+        draft.ability_method = None
+        draft.ability_scores = {}
+    elif isinstance(event, CharacterFinalizedEvent):
+        world.character_drafts[event.draft_id] = event.draft.model_copy(deep=True)
+        profile = event.profile.model_copy(deep=True)
+        world.characters[profile.entity_id] = profile
     elif isinstance(event, NpcSpawnedEvent):
         world.entities[event.entity.id] = event.entity.model_copy(deep=True)
         world.entity_templates[event.entity.id] = event.template_id
@@ -163,13 +181,15 @@ def apply_event(world: WorldState, event: Event) -> None:
         world.time_minutes = event.now_ms // 60_000
         world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
     elif isinstance(event, TimelineItemScheduledEvent):
-        world.timeline.queue[event.item.id] = event.item.model_copy(deep=True)
-        world.timeline.next_order = max(world.timeline.next_order, event.item.order + 1)
+        item = event.item.model_copy(deep=True)
+        world.timeline.queue[item.id] = item
+        world.timeline.next_order = max(world.timeline.next_order, item.order + 1)
     elif isinstance(event, TimelineItemFiredEvent):
         world.timeline.queue.pop(event.item.id, None)
         if event.rescheduled_item is not None:
             item = event.rescheduled_item.model_copy(deep=True)
             world.timeline.queue[item.id] = item
+            world.timeline.next_order = max(world.timeline.next_order, item.order + 1)
     elif isinstance(event, TimelineItemCancelledEvent):
         world.timeline.queue.pop(event.item_id, None)
     elif isinstance(event, TimelinePauseChangedEvent):
@@ -220,30 +240,6 @@ def apply_event(world: WorldState, event: Event) -> None:
             ]
             if not window.offers:
                 world.reaction_windows.pop(event.trigger_id, None)
-    elif isinstance(event, TimelineConfiguredEvent):
-        world.timeline.mode = event.mode
-        world.timeline.turn_quantum_ms = event.turn_quantum_ms
-        world.timeline.turn_timeout_ms = event.turn_timeout_ms
-        world.timeline.paused = event.paused
-        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
-    elif isinstance(event, TimelineItemScheduledEvent):
-        item = event.item.model_copy(deep=True)
-        world.timeline.queue[item.id] = item
-        world.timeline.next_order = max(world.timeline.next_order, item.order + 1)
-    elif isinstance(event, TimelineItemCancelledEvent):
-        world.timeline.queue.pop(event.item_id, None)
-    elif isinstance(event, TimelineAdvancedEvent):
-        world.timeline.now_ms = event.time_ms
-        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
-        world.time_minutes = event.time_ms // 60_000
-    elif isinstance(event, TimelineItemFiredEvent):
-        world.timeline.queue.pop(event.item.id, None)
-        if event.rescheduled_item is not None:
-            rescheduled = event.rescheduled_item.model_copy(deep=True)
-            world.timeline.queue[rescheduled.id] = rescheduled
-            world.timeline.next_order = max(world.timeline.next_order, rescheduled.order + 1)
-    elif isinstance(event, TimelinePauseChangedEvent):
-        world.timeline.paused = event.paused
     elif isinstance(event, LivingWorldInitializedEvent):
         world.living_world_initialized = True
     elif isinstance(event, CalendarAdvancedEvent):
@@ -292,13 +288,11 @@ def apply_event(world: WorldState, event: Event) -> None:
     elif isinstance(event, ResourceHarvestedEvent):
         node = world.resource_nodes[event.node_id]
         node.amount = event.node_amount_after
-        actor = world.entities[event.actor_id]
-        actor.inventory.item_ids = list(event.actor_item_ids_after)
+        world.entities[event.actor_id].inventory.item_ids = list(event.actor_item_ids_after)
     elif isinstance(event, ResourceRegeneratedEvent):
         node = world.resource_nodes[event.node_id]
         node.amount = event.amount_after
         node.last_regen_minute = event.last_regen_minute
-
     elif isinstance(event, NpcMemoryRecordedEvent):
         memory = event.memory.model_copy(deep=True)
         world.npc_memories.setdefault(memory.actor_id, {})[memory.id] = memory

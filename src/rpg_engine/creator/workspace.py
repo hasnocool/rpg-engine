@@ -94,7 +94,7 @@ class CreatorWorkspace:
         name: str,
         version: str = "0.1.0",
         ruleset: str = "d20",
-        engine: str = ">=0.9,<1.0",
+        engine: str = ">=0.9,<2.0",
         force: bool = False,
     ) -> None:
         """Create a new creator workspace without overwriting existing content by default."""

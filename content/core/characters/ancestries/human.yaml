@@ -1,0 +1,13 @@
+id: human
+name: Human
+description: Adaptable people found across many cultures and regions.
+ability_bonuses:
+  strength: 1
+  dexterity: 1
+  constitution: 1
+  intelligence: 1
+  wisdom: 1
+  charisma: 1
+movement_speed: 30
+tags: [human]
+languages: [common]

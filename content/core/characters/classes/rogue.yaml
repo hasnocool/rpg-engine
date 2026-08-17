@@ -1,0 +1,9 @@
+id: rogue
+name: Rogue
+description: A quick, precise adventurer who relies on mobility and cleverness.
+hit_die: 8
+primary_abilities: [dexterity]
+saving_throw_abilities: [dexterity, intelligence]
+starting_item_ids: [shortbow]
+starting_currency:
+  gold: 12

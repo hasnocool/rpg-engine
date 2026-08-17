@@ -1,0 +1,9 @@
+id: highland_dwarf
+name: Highland Dwarf
+description: Sturdy mountain folk known for endurance and practical strength.
+ability_bonuses:
+  constitution: 2
+  strength: 1
+movement_speed: 25
+tags: [dwarf, mountain]
+languages: [common, dwarven]

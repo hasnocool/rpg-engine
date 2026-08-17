@@ -1,0 +1,14 @@
+id: mage
+name: Mage
+description: A student of supernatural forces who solves problems through knowledge.
+hit_die: 6
+primary_abilities: [intelligence]
+saving_throw_abilities: [intelligence, wisdom]
+starting_item_ids: []
+starting_currency:
+  gold: 8
+resource_pools:
+  focus:
+    current: 2
+    maximum: 2
+    recharge: long_rest

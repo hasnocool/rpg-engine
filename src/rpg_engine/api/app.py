@@ -6,7 +6,6 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -19,6 +18,8 @@ from rpg_engine.api.contracts import (
     ObservationEnvelope,
     StateEnvelope,
 )
+from rpg_engine.character_creation import CharacterCreationCatalog
+from rpg_engine.character_web import CHARACTER_CREATOR_HTML
 from rpg_engine.commands import Command, parse_command
 from rpg_engine.content.loader import load_content_pack_async
 from rpg_engine.engine import SimulationError
@@ -27,12 +28,13 @@ from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
+from rpg_engine.visuals import (
+    VisualBindingManifest,
+    load_visual_bindings_async,
+    presentation_hints_for_event,
+    visual_snapshot_from_observation,
+)
 from rpg_engine.webclient import INDEX_HTML
-
-if TYPE_CHECKING:
-    from fastapi import FastAPI
-
-_app_state_service: CampaignService | None = None
 
 
 def _event_envelope(campaign_id: str, events: list[Event], *, cursor: int) -> EventEnvelope:
@@ -55,12 +57,18 @@ def create_app(
     *,
     database_path: Path | str = "rpg_engine.db",
     content_path: Path | str | None = None,
+    visual_bindings_path: Path | str | None = None,
     campaign_service: CampaignService | None = None,
 ) -> FastAPI:
     store = SQLiteEventStore(database_path)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        bindings = VisualBindingManifest()
+        if visual_bindings_path is not None:
+            bindings = await load_visual_bindings_async(Path(visual_bindings_path))
+        app.state.visual_bindings = bindings
+
         if campaign_service is not None:
             app.state.service = campaign_service
             yield
@@ -69,9 +77,7 @@ def create_app(
         content = None
         if content_path is not None:
             content = await load_content_pack_async(Path(content_path))
-        global _app_state_service
-        _app_state_service = CampaignService(store, content=content)
-        app.state.service = _app_state_service
+        app.state.service = CampaignService(store, content=content)
         yield
 
     app = FastAPI(
@@ -83,8 +89,10 @@ def create_app(
     v1 = APIRouter(prefix="/api/v1")
 
     def service() -> CampaignService:
-        assert _app_state_service is not None
-        return _app_state_service
+        return app.state.service
+
+    def visual_bindings() -> VisualBindingManifest:
+        return app.state.visual_bindings
 
     async def state_for(campaign_id: str) -> WorldState:
         try:
@@ -118,6 +126,14 @@ def create_app(
     async def v1_health() -> ApiInfo:
         return ApiInfo(engine_version=__version__)
 
+    @v1.get(
+        "/character-creation/catalog",
+        response_model=CharacterCreationCatalog,
+        operation_id="v1_character_creation_catalog",
+    )
+    async def v1_character_creation_catalog() -> CharacterCreationCatalog:
+        return await service().character_creation_catalog()
+
     @v1.post("/campaigns", response_model=StateEnvelope, operation_id="v1_create_campaign")
     async def v1_create_campaign(request: CampaignCreateRequest) -> StateEnvelope:
         try:
@@ -148,6 +164,33 @@ def create_app(
         return ObservationEnvelope(
             observation=await observation_for(campaign_id, actor_id)
         )
+
+    @v1.get(
+        "/campaigns/{campaign_id}/visual",
+        operation_id="v1_campaign_visual",
+    )
+    async def v1_campaign_visual(
+        campaign_id: str,
+        actor_id: str | None = Query(default=None),
+    ) -> dict[str, object]:
+        observation = await observation_for(campaign_id, actor_id)
+        visual = visual_snapshot_from_observation(observation, visual_bindings())
+        return {"visual": visual.model_dump(mode="json")}
+
+    @v1.get(
+        "/campaigns/{campaign_id}/presentation",
+        operation_id="v1_campaign_presentation",
+    )
+    async def v1_campaign_presentation(
+        campaign_id: str,
+        after: int = Query(default=0, ge=0),
+    ) -> dict[str, object]:
+        events = await events_for(campaign_id, after)
+        batches = [
+            presentation_hints_for_event(event, visual_bindings()).model_dump(mode="json")
+            for event in events
+        ]
+        return {"campaign_id": campaign_id, "batches": batches}
 
     @v1.get(
         "/campaigns/{campaign_id}/events",
@@ -247,7 +290,10 @@ def create_app(
     async def browser_client() -> str:
         return INDEX_HTML
 
-    # Backward-compatible v0.1-v0.3 routes. New clients should use /api/v1.
+    @app.get("/character-creator", response_class=HTMLResponse, include_in_schema=False)
+    async def character_creator() -> str:
+        return CHARACTER_CREATOR_HTML
+
     @app.get("/health", deprecated=True)
     async def legacy_health() -> dict[str, str]:
         return {"status": "ok"}

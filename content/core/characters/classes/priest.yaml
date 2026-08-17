@@ -1,0 +1,14 @@
+id: priest
+name: Priest
+description: A devoted adventurer whose resolve and wisdom support the group.
+hit_die: 8
+primary_abilities: [wisdom]
+saving_throw_abilities: [wisdom, charisma]
+starting_item_ids: []
+starting_currency:
+  gold: 10
+resource_pools:
+  devotion:
+    current: 2
+    maximum: 2
+    recharge: long_rest

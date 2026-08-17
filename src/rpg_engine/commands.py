@@ -8,8 +8,10 @@ from pydantic import Field, TypeAdapter, model_validator
 
 from rpg_engine.models import (
     Ability,
+    AbilityGenerationMethod,
     AiEncounterProposal,
     AiQuestProposal,
+    CharacterDescription,
     Entity,
     Position,
     StrictModel,
@@ -20,6 +22,42 @@ from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 class CreateEntityCommand(StrictModel):
     type: Literal["create_entity"] = "create_entity"
     entity: Entity
+
+
+class BeginCharacterCreationCommand(StrictModel):
+    type: Literal["begin_character_creation"] = "begin_character_creation"
+    draft_id: str = Field(min_length=1, max_length=120)
+    entity_id: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=200)
+
+
+class UpdateCharacterDraftCommand(StrictModel):
+    type: Literal["update_character_draft"] = "update_character_draft"
+    draft_id: str
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    ancestry_id: str | None = None
+    class_id: str | None = None
+    background_id: str | None = None
+    description: CharacterDescription | None = None
+
+
+class GenerateCharacterAbilitiesCommand(StrictModel):
+    type: Literal["generate_character_abilities"] = "generate_character_abilities"
+    draft_id: str
+    method: AbilityGenerationMethod
+
+
+class AssignCharacterAbilitiesCommand(StrictModel):
+    type: Literal["assign_character_abilities"] = "assign_character_abilities"
+    draft_id: str
+    method: AbilityGenerationMethod
+    scores: dict[Ability, int]
+
+
+class FinalizeCharacterCommand(StrictModel):
+    type: Literal["finalize_character"] = "finalize_character"
+    draft_id: str
+    start_location_id: str | None = None
 
 
 class SpawnNpcCommand(StrictModel):
@@ -335,6 +373,11 @@ class ActivateAiProposalCommand(StrictModel):
 
 Command = Annotated[
     CreateEntityCommand
+    | BeginCharacterCreationCommand
+    | UpdateCharacterDraftCommand
+    | GenerateCharacterAbilitiesCommand
+    | AssignCharacterAbilitiesCommand
+    | FinalizeCharacterCommand
     | SpawnNpcCommand
     | MoveActorCommand
     | ExploreLocationCommand

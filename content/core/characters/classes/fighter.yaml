@@ -1,0 +1,9 @@
+id: fighter
+name: Fighter
+description: A disciplined martial adventurer trained for direct conflict.
+hit_die: 10
+primary_abilities: [strength, dexterity]
+saving_throw_abilities: [strength, constitution]
+starting_item_ids: [longsword]
+starting_currency:
+  gold: 10

@@ -1,4 +1,4 @@
-"""Renderer-neutral campaign observation models for v0.5 clients."""
+"""Renderer-neutral campaign observation models for v0.5+ clients."""
 
 from __future__ import annotations
 
@@ -23,6 +23,12 @@ class ActorObservation(StrictModel):
     faction_id: str | None = None
     equipment: dict[str, str] = Field(default_factory=dict)
     currency: dict[str, int] = Field(default_factory=dict)
+    ancestry_id: str | None = None
+    class_id: str | None = None
+    background_id: str | None = None
+    level: int | None = None
+    pronouns: str = ""
+    appearance: str = ""
 
 
 class ExitObservation(StrictModel):
@@ -85,6 +91,7 @@ def _actor_observation(world: WorldState, entity_id: str) -> ActorObservation:
     health = None
     if entity.health is not None:
         health = HealthObservation(current=entity.health.current, maximum=entity.health.maximum)
+    character = world.characters.get(entity_id)
     return ActorObservation(
         id=entity.id,
         name=entity.identity.name,
@@ -95,6 +102,12 @@ def _actor_observation(world: WorldState, entity_id: str) -> ActorObservation:
         faction_id=entity.faction_id,
         equipment=dict(entity.inventory.equipment),
         currency=dict(entity.inventory.currency),
+        ancestry_id=character.ancestry_id if character is not None else None,
+        class_id=character.class_id if character is not None else None,
+        background_id=character.background_id if character is not None else None,
+        level=character.level if character is not None else None,
+        pronouns=character.description.pronouns if character is not None else "",
+        appearance=character.description.appearance if character is not None else "",
     )
 
 

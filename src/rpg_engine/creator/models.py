@@ -14,7 +14,7 @@ class ModMetadata(StrictModel):
     """Optional creator/mod metadata stored in ``mod.yaml`` beside a content manifest."""
 
     schema_version: int = Field(default=1, ge=1)
-    engine: str = ">=0.9,<1.0"
+    engine: str = ">=0.9,<2.0"
     dependencies: list[VersionRequirement] = Field(default_factory=list)
     rules_plugins: list[VersionRequirement] = Field(default_factory=list)
 

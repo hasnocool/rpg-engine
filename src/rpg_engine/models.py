@@ -25,6 +25,13 @@ class Ability(StrEnum):
     CHARISMA = "charisma"
 
 
+class AbilityGenerationMethod(StrEnum):
+    STANDARD_ARRAY = "standard_array"
+    POINT_BUY = "point_buy"
+    ROLLED = "rolled"
+    MANUAL = "manual"
+
+
 class ActionKind(StrEnum):
     ACTION = "action"
     BONUS_ACTION = "bonus_action"
@@ -124,6 +131,50 @@ class Entity(StrictModel):
     @property
     def is_alive(self) -> bool:
         return self.health is None or self.health.current > 0
+
+
+class CharacterDescription(StrictModel):
+    """User-authored character-sheet description kept separate from combat mechanics."""
+
+    pronouns: str = Field(default="", max_length=80)
+    age: int | None = Field(default=None, ge=0, le=10_000)
+    appearance: str = Field(default="", max_length=4000)
+    personality: str = Field(default="", max_length=4000)
+    ideals: str = Field(default="", max_length=2000)
+    bonds: str = Field(default="", max_length=2000)
+    flaws: str = Field(default="", max_length=2000)
+    backstory: str = Field(default="", max_length=12_000)
+    goals: str = Field(default="", max_length=4000)
+    notes: str = Field(default="", max_length=8000)
+
+
+class CharacterCreationDraft(StrictModel):
+    id: str
+    entity_id: str
+    name: str
+    ancestry_id: str | None = None
+    class_id: str | None = None
+    background_id: str | None = None
+    description: CharacterDescription = Field(default_factory=CharacterDescription)
+    generated_method: AbilityGenerationMethod | None = None
+    generated_ability_pool: list[int] = Field(default_factory=list)
+    ability_generation_count: int = Field(default=0, ge=0)
+    ability_method: AbilityGenerationMethod | None = None
+    ability_scores: dict[Ability, int] = Field(default_factory=dict)
+    finalized: bool = False
+
+
+class CharacterProfile(StrictModel):
+    entity_id: str
+    name: str
+    ancestry_id: str
+    class_id: str
+    background_id: str
+    level: int = Field(default=1, ge=1)
+    ability_method: AbilityGenerationMethod
+    base_ability_scores: dict[Ability, int]
+    final_ability_scores: dict[Ability, int]
+    description: CharacterDescription = Field(default_factory=CharacterDescription)
 
 
 class WeaponSpec(StrictModel):
@@ -408,3 +459,5 @@ class WorldState(StrictModel):
     offscreen_encounters: dict[str, OffscreenEncounterRecord] = Field(default_factory=dict)
     npc_memories: dict[str, dict[str, NpcMemory]] = Field(default_factory=dict)
     ai_proposals: dict[str, AiProposalRecord] = Field(default_factory=dict)
+    character_drafts: dict[str, CharacterCreationDraft] = Field(default_factory=dict)
+    characters: dict[str, CharacterProfile] = Field(default_factory=dict)
