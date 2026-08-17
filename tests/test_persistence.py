@@ -33,5 +33,7 @@ async def test_campaign_survives_service_reload(tmp_path: Path) -> None:
     state = await reloaded.state("campaign")
 
     assert state.time_minutes == 45
+    assert state.timeline.now_ms == 45 * 60_000
     assert state.entities["hero"].identity.name == "Hero"
-    assert state.sequence == 2
+    # entity_created + legacy time_advanced + first-class timeline_advanced
+    assert state.sequence == 3
