@@ -1,6 +1,7 @@
 # Roadmap
 
-The project is intentionally staged so simulation depth is built before expensive presentation work.
+The project is intentionally staged, while independent presentation/authoring work may land on
+parallel branches when it does not require an unfinished runtime milestone.
 
 ## v0.1 — Core Simulation (implemented)
 
@@ -56,7 +57,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - resource harvesting, regeneration, and ecology hooks
 - full event/reducer replay coverage for living-world state
 
-## v0.5 — Multiple Frontends (parallel track)
+## v0.5 — Multiple Frontends (parallel branch)
 
 - interactive CLI
 - Rich/Textual TUI adapter
@@ -64,14 +65,16 @@ The project is intentionally staged so simulation depth is built before expensiv
 - stable REST/OpenAPI contract
 - resumable WebSocket event subscriptions
 - renderer-neutral observation/query API
+- authenticated SSH terminal transport
 
-## v0.6 — Visual Adapters
+## v0.6 — Visual Adapters (parallel branch)
 
 - Godot 2D adapter
 - Godot 3D adapter
 - asset/scene binding manifests
-- movement interpolation events
-- animation/VFX/audio binding hints that remain non-authoritative
+- movement interpolation hints
+- animation/VFX/audio binding hints
+- SSH/terminal ASCII renderer using the same visual snapshot contract
 
 ## v0.7 — AI Game Master (implemented)
 
@@ -84,7 +87,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - async per-actor coordination with provider timeouts
 - offline evaluation and deterministic scenario benchmarks
 
-## v0.8 — Multiplayer
+## v0.8 — Multiplayer (planned; not yet implemented)
 
 - authoritative hosted campaign service
 - authenticated players/party membership
@@ -92,13 +95,26 @@ The project is intentionally staged so simulation depth is built before expensiv
 - reconnect/resume and spectators
 - rate limits and horizontal campaign placement
 
-## v0.9 — Creator Platform
+## v0.9 — Creator Platform (implemented out of sequence)
 
-- content-pack SDK and schema tooling
-- campaign/map/creature/item/effect editors
-- rules plugin SDK
-- validation/lint tooling
-- dependency/version constraints for mods
+- content-pack SDK and canonical resource catalog
+- generated JSON Schema bundle
+- campaign blueprint editor
+- graph map editor with creator-only layout coordinates
+- creature/NPC editor
+- item/weapon and effect editors
+- generic editors for all existing content categories
+- browser + CLI + REST creator workflows
+- validation/lint reports suitable for CI
+- content-pack dependency/version constraints through optional `mod.yaml`
+- engine compatibility constraints for mods
+- rules-plugin SDK and Python entry-point discovery
+- rules-plugin version/API/engine requirement validation
+- atomic workspace writes and async-safe editor filesystem boundaries
+
+v0.9 is based on v0.7 because creator tooling does not require v0.8 multiplayer. It does not claim
+multiplayer is complete. The v0.5/v0.6 presentation work exists on a separate branch lineage and can
+consume creator-authored content after branch convergence.
 
 ## v1.0 — RPG Platform
 

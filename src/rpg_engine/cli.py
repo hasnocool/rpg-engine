@@ -1,4 +1,4 @@
-"""CLI adapter for demos, inspection, and running the API server."""
+"""CLI adapter for demos, inspection, creator tooling, and running the API server."""
 
 from __future__ import annotations
 
@@ -10,10 +10,12 @@ import typer
 
 from rpg_engine.commands import AttackTargetCommand, CreateEntityCommand
 from rpg_engine.content.loader import load_content_pack_async
+from rpg_engine.creator.cli import creator_app
 from rpg_engine.engine import SimulationEngine
 from rpg_engine.models import Entity, Health, Identity, Stats, WorldState
 
 app = typer.Typer(no_args_is_help=True, help="Headless deterministic RPG simulation engine")
+app.add_typer(creator_app, name="creator")
 
 
 @app.command()

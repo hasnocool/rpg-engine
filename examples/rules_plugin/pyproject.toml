@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling>=1.31"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rpg-engine-example-rules"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["rpg-engine>=0.9,<1.0"]
+
+[project.entry-points."rpg_engine.rules_plugins"]
+example = "example_rules:plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/example_rules"]
