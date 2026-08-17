@@ -1,131 +1,75 @@
 # Roadmap
 
-The project is intentionally staged so simulation depth is built before expensive presentation work.
+## v1.0 status
 
-## v0.1 — Core Simulation (implemented)
+The original v0.x roadmap has converged into the **v1.0 RPG Platform** line.
 
-- typed entities/components
-- commands and immutable events
-- deterministic named RNG streams
-- generic d20 `RulesRuntime`
-- checks and attacks
-- data-driven weapons/effects
-- conditions, healing, damage, time
-- snapshots + event persistence
-- async campaign authority service
-- REST/WebSocket adapter
-- CLI demo and CI
+### v0.1 — Core Simulation — implemented
 
-## v0.2 — Tactical RPG (implemented)
+Typed entities/components, deterministic RNG, commands/events, generic rules runtime, persistence,
+async authority service and basic API.
 
-- encounter aggregate and deterministic initiative
-- rounds/turn cursor and action economy
-- typed resolution/modifier provenance
-- trigger/reaction hooks
-- saving throws, concentration, resources, and damage traits
-- effect durations and renderer-neutral spatial targeting
-- tactical event replay
+### v0.2 — Tactical RPG — implemented
 
-### v0.2.1 — First-class Time (integrated into v0.4)
+Encounters, initiative, action economy, typed resolutions/modifiers, reactions, saving throws,
+effects, concentration/resources, damage traits and renderer-neutral spatial targeting.
 
-- `turn_based`, `timed_turn_based`, `real_time`, `real_time_with_pause`, and `hybrid`
-- one deterministic timeline for tactical and world scheduling
-- bounded recurrence/backlog draining
-- explicit monotonic wall-clock synchronization and pause semantics
+### v0.3 — Adventure Engine — implemented
 
-## v0.3 — Adventure Engine (implemented)
+World graph, exploration/discovery, NPC templates, containers/equipment, dialogue, quests,
+merchants and travel.
 
-- graph-based world maps and transitions
-- exploration/search/discovery
-- data-driven NPC templates
-- inventory containers, loot, equip/unequip
-- dialogue graph engine with checks/requirements
-- quest state machines
-- merchants and transactions
-- travel commands/events
+### v0.4 — Living World — implemented
 
-## v0.4 — Living World (implemented)
+First-class deterministic time, calendar, weather, NPC schedules, factions/reputation, settlement
+economy, off-screen encounters, rumors/dynamic quests and resource ecology.
 
-- calendar and scheduled world jobs
-- deterministic regional weather
-- NPC schedules and logical movement
-- faction relationships and actor reputation
-- settlement/economy primitives
-- deterministic off-screen encounter resolution
-- recurring rumors and dynamic quest generation/expiry
-- resource harvesting, regeneration, and ecology hooks
-- full event/reducer replay coverage for living-world state
+### v0.5 — Multiple Frontends — implemented and converged in v1.0
 
-## v0.5 — Multiple Frontends (parallel track)
+CLI, Textual TUI, browser client, versioned REST/OpenAPI, resumable WebSockets, observation API and
+authenticated SSH terminal transport.
 
-- interactive CLI
-- Rich/Textual TUI adapter
-- browser reference client
-- stable REST/OpenAPI contract
-- resumable WebSocket event subscriptions
-- renderer-neutral observation/query API
+### v0.6 — Visual Adapters — implemented and converged in v1.0
 
-## v0.6 — Visual Adapters
+Godot 2D/3D reference adapters, visual snapshots, scene/asset bindings and non-authoritative
+movement/animation/VFX/audio presentation hints.
 
-- Godot 2D adapter
-- Godot 3D adapter
-- asset/scene binding manifests
-- movement interpolation events
-- animation/VFX/audio binding hints that remain non-authoritative
+### v0.7 — AI Game Master — implemented
 
-## v0.7 — AI Game Master (implemented)
+Filtered actor observations, async provider/narrator contracts, deterministic utility/behavior-tree
+agents, NPC memory, validated encounter/quest proposals and offline evaluation.
 
-- actor-centric observation filtering
-- async AI command-provider protocol
-- deterministic utility AI and behavior-tree reference agents
-- async non-authoritative narrator protocol
-- event-sourced NPC memory/context store
-- procedural encounter/quest proposals requiring engine validation
-- async per-actor coordination with provider timeouts
-- offline evaluation and deterministic scenario benchmarks
+### v0.8 — Multiplayer — implemented and converged in v1.0
 
-## v0.8 — Multiplayer (implemented)
+Authenticated players, campaign membership, parties, spectators, optimistic/idempotent commands,
+resumable events, rate limits and horizontal campaign placement primitives.
 
-- authenticated hosted campaign service layered over `CampaignService`
-- PBKDF2 player credentials and expiring opaque sessions
-- owner/player/spectator campaign roles and controlled actor assignments
-- campaign parties with leader/member roles
-- optimistic `client_command_id` envelopes and persisted idempotency receipts
-- execution-lease fencing for abandoned in-flight command receipts
-- persisted reconnect/resume cursors with WebSocket heartbeats
-- spectator read-only access and conservative player event filtering
-- shared-database authentication/read/command rate limits
-- node heartbeats, rendezvous placement, leases, epochs, redirects, and failover
+### v0.9 — Creator Platform — implemented and converged in v1.0
 
-## v0.9 — Creator Platform
+Content SDK/schema tools, campaign/map/creature/item/effect editing, rules plugin SDK, validation,
+mod dependency/version constraints and local browser creator.
 
-- content-pack SDK and schema tooling
-- campaign/map/creature/item/effect editors
-- rules plugin SDK
-- validation/lint tooling
-- dependency/version constraints for mods
+## v1.0 — RPG Platform — implemented
 
-## v1.0 — RPG Platform
+- stable engine/rules/content API version declarations
+- stable `EngineSession` Python facade and published contract schemas
+- stable local and hosted v1 API wrappers
+- authenticated hosted campaigns from the v0.8 authority layer
+- client release/artifact manifests with compatibility and SHA-256 integrity metadata
+- community content release registry
+- read-only public distribution API
+- optional marketplace listing metadata, disabled by default
+- unified CLI exposing local/TUI/SSH, hosted, creator and distribution workflows
+- convergence of previously parallel v0.5/v0.6, v0.8 and v0.9 histories onto the v1 line
 
-- stable engine/rules/content APIs
-- hosted campaigns and downloadable clients
-- public engine API
-- community content distribution
-- optional creator marketplace
+## Post-1.0 candidates
 
-## Cross-cutting architecture milestones
+Future 1.x work can deepen capabilities without breaking v1 contracts:
 
-### Deterministic event sourcing
-
-Add command envelopes, idempotency keys, rules/content hashes, state hashes, replay verification,
-rewind, and branching timelines.
-
-### Spatial authority
-
-Deepen the v0.2 grid/graph contracts with occupancy, collision, pathfinding, line of sight, cover,
-terrain, and continuous-space semantics without renderer coupling.
-
-### Intelligent living actors
-
-Build perception, goals, utility scoring, behavior trees, tactical planning, and persistent memories
-on top of v0.4 schedules and the same command API used by humans.
+- verified release signing and provenance
+- richer spatial occupancy/collision/LOS/cover/pathfinding
+- rewind/branching campaign timelines and state-hash verification
+- distributed placement coordination and external auth providers
+- community registry federation and moderation metadata
+- packaged native client release automation
+- AI provider adapters and richer deterministic evaluation

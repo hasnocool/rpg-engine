@@ -1,0 +1,12 @@
+client_id: terminal
+name: RPG Engine Terminal Client
+version: 1.0.0
+channel: stable
+engine: ">=1,<2"
+api_version: "1.0"
+artifacts:
+  - platform: linux
+    arch: x86_64
+    kind: tar.gz
+    url: https://example.invalid/rpg-terminal-1.0.0-linux-x86_64.tar.gz
+    sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

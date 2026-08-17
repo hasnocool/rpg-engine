@@ -1,3 +1,3 @@
-"""Headless deterministic RPG simulation engine."""
+"""Headless deterministic RPG simulation and creator platform."""
 
-__version__ = "0.8.0"
+__version__ = "1.0.0"

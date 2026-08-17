@@ -1,4 +1,4 @@
-"""Minimal v0.9 rules-plugin example."""
+"""Minimal v1 rules-plugin example."""
 
 from typing import ClassVar
 
@@ -10,8 +10,8 @@ class ExampleRulesPlugin:
     descriptor: ClassVar[RulesPluginDescriptor] = RulesPluginDescriptor(
         id="example_rules",
         name="Example Rules",
-        version="0.1.0",
-        engine=">=0.9,<1.0",
+        version="1.0.0",
+        engine=">=1,<2",
         description="Small reference plugin using the built-in d20 behavior.",
     )
 

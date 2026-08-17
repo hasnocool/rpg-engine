@@ -1,70 +1,45 @@
-# rpg-engine
+# rpg-engine 1.0
 
-A **headless, deterministic, event-driven RPG simulation engine** for Python 3.12+.
+`rpg-engine` is a headless, deterministic, event-sourced tabletop RPG platform for Python 3.12+.
 
-The authoritative simulation is presentation-agnostic. CLI, TUI, web, Discord, 2D, 3D, AI, and
-multiplayer clients issue the same commands and consume the same immutable events.
+Version **1.0.0** converges the previously parallel simulation, multiplayer, frontend/visual, AI,
+and creator-platform tracks into one supported platform line.
 
-> The built-in `d20` runtime and `content/core` pack are original generic examples. Proprietary
-> tabletop rulebooks or campaign content are not bundled.
-
-## Current milestone: v0.8 Multiplayer
-
-v0.8 adds a hosted multiplayer authority layer on top of the deterministic simulation and v0.7 AI
-Game Master systems:
-
-- authenticated player accounts and expiring sessions
-- owner/player/spectator campaign roles
-- controlled-actor assignments and campaign parties
-- optimistic client command IDs with persisted idempotency receipts
-- execution-lease fencing for abandoned in-flight commands
-- reconnect/resume from persisted event cursors
-- spectator read-only access and conservative player event filtering
-- shared-database command/read/authentication rate limits
-- horizontal node heartbeats, rendezvous placement, leases, redirects, and failover
-
-The multiplayer layer coordinates **who may submit commands and how retries/reconnects are handled**.
-It does not bypass `CampaignService`, `SimulationEngine`, rules, hooks, RNG, or the immutable event
-log.
-
-## Architecture
+The engine remains authoritative and presentation-neutral:
 
 ```text
-Player / Spectator / AI / Client
-              |
-   bearer session + command ID
-              v
-+-------------------------------------+
-| HostedCampaignService               |
-| + auth / membership / parties       |
-| + idempotency / rate limits         |
-| + reconnect / spectator filtering   |
-| + horizontal campaign placement     |
-+------------------+------------------+
-                   |
-             typed Command
-                   v
-+-------------------------------------+
-| CampaignService                     | async per-campaign authority
-| +---------------------------------+ |
-| | SimulationEngine                | |
-| | + Tactical engine              | |
-| | + AdventureRuntime             | |
-| | + TimelineScheduler            | |
-| | + LivingWorldRuntime           | |
-| | + AIGameMasterRuntime          | |
-| | + Rules / Hooks / RNG          | |
-| +----------------+----------------+ |
-+------------------|------------------+
-                   | immutable Events
-           +-------+---------+
-           |                 |
-    SQLite/event log   REST/WebSocket
+                   commands
+CLI / TUI / Web / SSH / Godot / AI
+                     |
+                     v
++--------------------------------------------------+
+| CampaignService / HostedCampaignService          |
+| SimulationEngine                                 |
+| tactical + adventure + living world + AI runtime |
+| deterministic RNG + immutable events + replay    |
++--------------------------+-----------------------+
+                           |
+                    SQLite event log
 ```
 
-The scheduler and hosted layer remain async-safe. PBKDF2 and the synchronous SQLite multiplayer
-coordination operations run through `asyncio.to_thread`; heartbeat/reconnect waits use asyncio
-primitives rather than blocking sleeps.
+The bundled generic d20 runtime and example content are original project examples. Proprietary
+tabletop books or campaign text are not bundled.
+
+## Stable v1 contracts
+
+The following surfaces are public for the 1.x line:
+
+- `rpg_engine.public.EngineSession`
+- typed `Command` and immutable `Event` contracts
+- `WorldState` and content schemas
+- content-pack format and Creator Platform schemas
+- rules plugin API version `1`
+- local REST/WebSocket `/api/v1` contracts
+- hosted multiplayer `/v1` contracts
+- public platform/distribution `/v1` contracts
+
+Breaking changes to these contracts require a new engine major version. Additive fields and new
+commands/events may be added in compatible 1.x releases.
 
 ## Install
 
@@ -74,124 +49,90 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-## Run local/development authority
+## Play and host
 
 ```bash
-rpg-engine demo --seed 918392482
-rpg-engine serve --host 127.0.0.1 --port 8000
+rpg-engine demo
+rpg-engine serve
+rpg-engine serve-hosted --port 8001
+rpg-engine play --campaign CAMPAIGN_ID
+rpg-engine tui --campaign CAMPAIGN_ID
+rpg-engine serve-ssh --port 8022
 ```
 
-## Run the authenticated hosted multiplayer API
+SSH is an RPG protocol endpoint, not an operating-system shell.
+
+## Creator Platform
 
 ```bash
-uvicorn rpg_engine.api.hosted:app --host 0.0.0.0 --port 8000
+rpg-engine creator init ./my-pack --id my_pack --name "My Pack"
+rpg-engine creator new ./my-pack location village --name "Village"
+rpg-engine creator validate ./my-pack
+rpg-engine creator serve ./my-pack
 ```
 
-For a public deployment, put TLS in front of the hosted API and do not expose the legacy
-unauthenticated development adapter directly to the Internet.
+New v1 workspaces default to the engine constraint `>=1,<2`.
 
-## Multiplayer command envelope
+## Public Python API
 
-Hosted clients send their normal typed command inside an optimistic command envelope:
+```python
+from rpg_engine.public import EngineSession
 
-```json
-{
-  "client_command_id": "web-7f15c1a1",
-  "command": {
-    "type": "move_actor",
-    "actor_id": "fighter-1",
-    "position": {"area": "village"}
-  }
-}
+session = EngineSession.create(seed=42, campaign_id="demo")
+events = session.execute({
+    "type": "advance_time",
+    "minutes": 10,
+})
+state = session.state
 ```
 
-The receipt key is `campaign_id + player_id + client_command_id`. A retry with the same canonical
-command replays the stored authoritative result without executing it again. Reusing the client ID
-for different intent is rejected.
+`rpg_engine.public.public_contract_schemas()` exposes JSON Schema for commands, events, world state,
+content, and rules-plugin descriptors.
 
-Clients can reconcile an optimistic command after reconnect with:
+## Community distribution
 
-```text
-GET /v1/campaigns/{campaign_id}/commands/{client_command_id}
+v1 includes a local/admin-managed release registry and a read-only public API.
+
+```bash
+rpg-engine platform init
+rpg-engine platform publish-client client-release.yaml
+rpg-engine platform publish-content content-release.yaml
+rpg-engine platform serve --port 8080
 ```
 
-## Reconnect and resume
+A client release records platform/architecture, download URL, SHA-256, engine compatibility, and
+release channel. Content releases record the same compatibility/integrity information plus
+license/tags/dependencies.
 
-The event log remains the source of truth:
+The registry resolves the highest compatible release and exposes redirect endpoints for downloads.
+It does not silently download or execute artifacts.
 
-```text
-GET /v1/campaigns/{campaign_id}/events?after=418
-WS  /v1/campaigns/{campaign_id}/events/ws?after=418&token=...
-```
+## Optional creator marketplace
 
-The WebSocket first replays persisted events, then waits for new ones and emits heartbeat envelopes
-without changing the event cursor. The global cursor advances across filtered/hidden events so a
-player cannot become stuck replaying sequences they are not allowed to see.
+Marketplace support is **metadata-only and disabled by default**. A listing can reference a
+published content release, publisher, license, price metadata, tags, and an optional external
+checkout URL. `rpg-engine` does not process payments or store payment credentials.
 
-## Horizontal placement
+## Visual adapters and clients
 
-Each hosted node registers a unique `node_id` and routable `public_url`. Campaign ownership uses
-rendezvous hashing over live nodes plus persisted leases and monotonically increasing placement
-epochs. Expired nodes are removed from consideration and the next request deterministically fails
-over to a surviving node.
+The repository includes terminal/CLI, Textual TUI, a browser reference client, authenticated SSH,
+renderer-neutral observations/visual snapshots, Godot 2D/3D reference adapters, and resumable event
+and presentation subscriptions.
 
-Requests reaching a non-owner node receive HTTP 307 with the current placement. WebSocket clients
-receive a redirect envelope and reconnect to the owning node.
+See `docs/FRONTENDS.md` and `docs/VISUAL_ADAPTERS.md`.
 
-The included `MultiplayerStore` is the SQLite reference coordination backend and is suitable for
-multiple processes sharing a local WAL database. Multi-host production deployments should use a
-shared coordination database with equivalent transactional semantics rather than SQLite over an
-unsafe network filesystem.
+## Simulation depth
 
-## AI Game Master
+The unified v1 line includes deterministic tactical encounters, adventure maps/dialogue/quests,
+first-class time, living-world weather/schedules/factions/economy/ecology, AI provider/narrator
+contracts and memory, plus authenticated multiplayer/parties/spectators/idempotent commands.
 
-AI providers receive `AiObservation` rather than raw `WorldState`. Hidden connections, remote
-actors, unrelated inventories/resources, and other non-visible state are filtered before a provider
-runs.
+See `docs/TACTICAL.md`, `docs/ADVENTURE.md`, `docs/LIVING_WORLD.md`,
+`docs/AI_GAME_MASTER.md`, and `docs/MULTIPLAYER.md`.
 
-Reference implementations include `UtilityAgent`, `BehaviorTreeAgent`, and
-`DeterministicNarrator`. `AIGameMasterCoordinator` is asynchronous and serializes turns for the same
-actor without blocking the event loop.
+## Platform documentation
 
-AI encounter/quest proposals are validated and persisted before activation. Accepted encounter
-proposals delegate to `StartEncounterCommand`; accepted quest proposals must reference a validated
-dynamic quest template and delegate to `GenerateDynamicQuestCommand`.
-
-## First-class time and Living World
-
-The same deterministic first-class timeline carries tactical readiness, delayed actions, effects,
-world events, NPC schedules, reaction windows, and idle pressure across these policies:
-
-```text
-turn_based
-timed_turn_based
-real_time
-real_time_with_pause
-hybrid
-```
-
-v0.4 Living World adds calendar/seasons, weather, NPC schedules, factions/reputation, settlement
-economy, off-screen encounters, rumors/dynamic quests, and renewable ecology.
-
-## Determinism and replay
-
-Randomness uses named counter-based streams:
-
-```text
-campaign seed + stream name + stream counter -> deterministic roll
-```
-
-Game-state changes still flow through immutable events and reducers. Multiplayer sessions,
-idempotency receipts, rate-limit counters, party records, and placement leases are hosting state and
-are intentionally kept outside deterministic `WorldState`.
-
-## Documentation
-
-- [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md) — v0.8 hosted multiplayer contract
-- [`docs/AI_GAME_MASTER.md`](docs/AI_GAME_MASTER.md) — v0.7 AI authority contract
-- [`docs/LIVING_WORLD.md`](docs/LIVING_WORLD.md) — v0.4 living-world systems
-- [`docs/ADVENTURE.md`](docs/ADVENTURE.md) — v0.3 adventure systems
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — milestone sequencing
+See `docs/PLATFORM.md`, `docs/CREATOR_PLATFORM.md`, and `docs/ROADMAP.md`.
 
 ## Test
 
@@ -199,8 +140,3 @@ are intentionally kept outside deterministic `WorldState`.
 ruff check .
 pytest --cov=rpg_engine --cov-report=term-missing
 ```
-
-## Next milestone
-
-The next roadmap milestone is **v0.9 Creator Platform**: content-pack SDK/schema tooling, editors,
-rules plugin SDK, validation/lint tooling, and dependency/version constraints for mods.
