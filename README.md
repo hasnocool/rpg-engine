@@ -8,21 +8,22 @@ multiplayer clients issue the same commands and consume the same immutable event
 > The built-in `d20` runtime and `content/core` pack are original generic examples. Proprietary
 > tabletop rulebooks or campaign content are not bundled.
 
-## Current milestone: v0.4 Living World
+## Current milestone: v0.7 AI Game Master
 
-v0.4 builds on the v0.3 Adventure Engine and makes time and off-screen world change authoritative:
+v0.7 adds an advisory AI authority layer on top of the deterministic v0.4 Living World:
 
-- one deterministic first-class timeline with five time policies
-- calendar/seasons and recurring scheduled world jobs
-- deterministic regional weather
-- schedule-driven NPC location/activity state
-- faction relationships and actor reputation
-- recurring settlement production/consumption/economy ticks
-- deterministic coarse off-screen encounter resolution
-- recurring rumors that can generate dynamic quests
-- quest expiry and authoritative rewards
-- renewable resource nodes, harvesting, regeneration, and ecology hooks
-- event/reducer replay for all v0.4 state
+- actor-centric observation filtering with hidden-information boundaries
+- async AI command-provider protocol
+- deterministic utility-AI and behavior-tree reference agents
+- async non-authoritative narrator protocol
+- event-sourced NPC memory/context store
+- engine-validated encounter and dynamic-quest proposals
+- async per-actor AI coordination with timeouts and serialization
+- offline deterministic scenario benchmarks
+- replay support for AI memories and proposal state
+
+The AI layer is intentionally model-provider neutral. Local models, hosted APIs, scripted agents, or
+future v0.5/v0.6 frontends can use the same protocols without becoming authoritative.
 
 The engine still knows nothing about pixels, meshes, terminal colors, cameras, WebGL, or input
 devices.
@@ -42,6 +43,7 @@ Human / AI / Client
 | | + AdventureRuntime             | |
 | | + TimelineScheduler            | |
 | | + LivingWorldRuntime           | |
+| | + AIGameMasterRuntime          | |
 | | + Rules / Hooks / RNG          | |
 | +----------------+----------------+ |
 +------------------|------------------+
@@ -154,6 +156,22 @@ Resolve a coarse off-screen conflict:
 }
 ```
 
+## AI Game Master
+
+AI providers receive `AiObservation` rather than raw `WorldState`. Hidden connections, remote
+actors, unrelated inventories/resources, and other non-visible state are filtered out before a
+provider runs.
+
+Reference implementations include `UtilityAgent`, `BehaviorTreeAgent`, and
+`DeterministicNarrator`. `AIGameMasterCoordinator` is fully asynchronous and serializes turns for
+the same actor without blocking the event loop.
+
+AI encounter/quest proposals are validated and persisted before activation. Accepted encounter
+proposals delegate to `StartEncounterCommand`; accepted quest proposals must reference a validated
+dynamic quest template and delegate to `GenerateDynamicQuestCommand`.
+
+See [`docs/AI_GAME_MASTER.md`](docs/AI_GAME_MASTER.md) for the full v0.7 contract.
+
 ## Determinism and replay
 
 Randomness uses named counter-based streams:
@@ -185,8 +203,9 @@ NPC templates may bind a schedule with `schedule_id`. Cross-file content validat
 locations, factions, schedules, quest templates, regions, resource items, and other broken links at
 load time.
 
-See [`docs/LIVING_WORLD.md`](docs/LIVING_WORLD.md) for the detailed v0.4 contract and
-[`docs/ADVENTURE.md`](docs/ADVENTURE.md) for v0.3 adventure systems.
+See [`docs/AI_GAME_MASTER.md`](docs/AI_GAME_MASTER.md) for v0.7,
+[`docs/LIVING_WORLD.md`](docs/LIVING_WORLD.md) for v0.4, and
+[`docs/ADVENTURE.md`](docs/ADVENTURE.md) for v0.3.
 
 ## Test
 
@@ -195,7 +214,8 @@ ruff check .
 pytest --cov=rpg_engine --cov-report=term-missing
 ```
 
-## Next milestone
+## Roadmap sequencing
 
-The next roadmap milestone is **v0.5 Multiple Frontends**: interactive CLI, Textual/Rich TUI,
-browser reference client, stable observation/query APIs, and resumable event subscriptions.
+v0.7 is implemented as a simulation/AI layer directly on v0.4. The separate v0.5 frontend track
+remains in PR #5 and v0.6 visual adapters remain planned; neither is required for the AI protocols.
+The next roadmap milestone after v0.7 is **v0.8 Multiplayer**.

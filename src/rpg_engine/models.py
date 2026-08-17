@@ -332,6 +332,52 @@ class OffscreenEncounterRecord(StrictModel):
     resolved_at_minute: int = Field(ge=0)
 
 
+class NpcMemory(StrictModel):
+    id: str
+    actor_id: str
+    summary: str
+    importance: int = Field(default=50, ge=0, le=100)
+    tags: set[str] = Field(default_factory=set)
+    subject_ids: set[str] = Field(default_factory=set)
+    created_sequence: int = Field(ge=0)
+    created_at_minute: int = Field(ge=0)
+    expires_at_minute: int | None = Field(default=None, ge=0)
+
+
+class AiEncounterProposal(StrictModel):
+    id: str
+    participant_ids: list[str] = Field(min_length=2)
+    location_id: str | None = None
+    rationale: str = ""
+
+
+class AiQuestProposal(StrictModel):
+    id: str
+    origin_location_id: str
+    template_id: str
+    actor_id: str | None = None
+    rationale: str = ""
+
+
+class AiProposalRecord(StrictModel):
+    id: str
+    kind: Literal["encounter", "quest"]
+    status: Literal["validated", "rejected", "activated"]
+    reasons: list[str] = Field(default_factory=list)
+    encounter: AiEncounterProposal | None = None
+    quest: AiQuestProposal | None = None
+    created_sequence: int = Field(ge=0)
+    activated_sequence: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_payload(self) -> AiProposalRecord:
+        if self.kind == "encounter" and self.encounter is None:
+            raise ValueError("encounter proposal record requires encounter payload")
+        if self.kind == "quest" and self.quest is None:
+            raise ValueError("quest proposal record requires quest payload")
+        return self
+
+
 class WorldState(StrictModel):
     campaign_id: str
     seed: int
@@ -360,3 +406,5 @@ class WorldState(StrictModel):
     dynamic_quests: dict[str, DynamicQuestState] = Field(default_factory=dict)
     resource_nodes: dict[str, ResourceNodeState] = Field(default_factory=dict)
     offscreen_encounters: dict[str, OffscreenEncounterRecord] = Field(default_factory=dict)
+    npc_memories: dict[str, dict[str, NpcMemory]] = Field(default_factory=dict)
+    ai_proposals: dict[str, AiProposalRecord] = Field(default_factory=dict)

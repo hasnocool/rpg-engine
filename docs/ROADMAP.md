@@ -56,7 +56,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - resource harvesting, regeneration, and ecology hooks
 - full event/reducer replay coverage for living-world state
 
-## v0.5 — Multiple Frontends (next)
+## v0.5 — Multiple Frontends (parallel track)
 
 - interactive CLI
 - Rich/Textual TUI adapter
@@ -73,14 +73,15 @@ The project is intentionally staged so simulation depth is built before expensiv
 - movement interpolation events
 - animation/VFX/audio binding hints that remain non-authoritative
 
-## v0.7 — AI Game Master
+## v0.7 — AI Game Master (implemented)
 
-- observation filtering
-- AI command-provider protocol
-- utility AI / behavior tree reference agents
-- narrator protocol
-- NPC memory/context store
+- actor-centric observation filtering
+- async AI command-provider protocol
+- deterministic utility AI and behavior-tree reference agents
+- async non-authoritative narrator protocol
+- event-sourced NPC memory/context store
 - procedural encounter/quest proposals requiring engine validation
+- async per-actor coordination with provider timeouts
 - offline evaluation and deterministic scenario benchmarks
 
 ## v0.8 — Multiplayer

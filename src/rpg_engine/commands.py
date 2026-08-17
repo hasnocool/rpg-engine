@@ -6,8 +6,15 @@ from typing import Annotated, Literal
 
 from pydantic import Field, TypeAdapter, model_validator
 
-from rpg_engine.models import Ability, Entity, Position, StrictModel
-from rpg_engine.timeline import TimeMode, TimelineItemKind, TimelinePayload
+from rpg_engine.models import (
+    Ability,
+    AiEncounterProposal,
+    AiQuestProposal,
+    Entity,
+    Position,
+    StrictModel,
+)
+from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):
@@ -291,6 +298,41 @@ class HarvestResourceCommand(StrictModel):
     amount: int = Field(default=1, gt=0, le=1000)
 
 
+class RecordNpcMemoryCommand(StrictModel):
+    type: Literal["record_npc_memory"] = "record_npc_memory"
+    actor_id: str
+    memory_id: str
+    summary: str = Field(min_length=1, max_length=2000)
+    importance: int = Field(default=50, ge=0, le=100)
+    tags: set[str] = Field(default_factory=set)
+    subject_ids: set[str] = Field(default_factory=set)
+    expires_after_minutes: int | None = Field(default=None, gt=0)
+
+
+class ForgetNpcMemoryCommand(StrictModel):
+    type: Literal["forget_npc_memory"] = "forget_npc_memory"
+    actor_id: str
+    memory_id: str
+    reason: str = "explicit_forget"
+
+
+class SubmitAiEncounterProposalCommand(StrictModel):
+    type: Literal["submit_ai_encounter_proposal"] = "submit_ai_encounter_proposal"
+    proposal: AiEncounterProposal
+    activate: bool = False
+
+
+class SubmitAiQuestProposalCommand(StrictModel):
+    type: Literal["submit_ai_quest_proposal"] = "submit_ai_quest_proposal"
+    proposal: AiQuestProposal
+    activate: bool = False
+
+
+class ActivateAiProposalCommand(StrictModel):
+    type: Literal["activate_ai_proposal"] = "activate_ai_proposal"
+    proposal_id: str
+
+
 Command = Annotated[
     CreateEntityCommand
     | SpawnNpcCommand
@@ -332,7 +374,12 @@ Command = Annotated[
     | GenerateRumorCommand
     | GenerateDynamicQuestCommand
     | CompleteDynamicQuestCommand
-    | HarvestResourceCommand,
+    | HarvestResourceCommand
+    | RecordNpcMemoryCommand
+    | ForgetNpcMemoryCommand
+    | SubmitAiEncounterProposalCommand
+    | SubmitAiQuestProposalCommand
+    | ActivateAiProposalCommand,
     Field(discriminator="type"),
 ]
 
