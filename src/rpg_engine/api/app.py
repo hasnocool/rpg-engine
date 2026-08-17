@@ -28,6 +28,12 @@ from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
+from rpg_engine.visuals import (
+    VisualBindingManifest,
+    load_visual_bindings_async,
+    presentation_hints_for_event,
+    visual_snapshot_from_observation,
+)
 from rpg_engine.webclient import INDEX_HTML
 
 
@@ -51,12 +57,18 @@ def create_app(
     *,
     database_path: Path | str = "rpg_engine.db",
     content_path: Path | str | None = None,
+    visual_bindings_path: Path | str | None = None,
     campaign_service: CampaignService | None = None,
 ) -> FastAPI:
     store = SQLiteEventStore(database_path)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        bindings = VisualBindingManifest()
+        if visual_bindings_path is not None:
+            bindings = await load_visual_bindings_async(Path(visual_bindings_path))
+        app.state.visual_bindings = bindings
+
         if campaign_service is not None:
             app.state.service = campaign_service
             yield
@@ -78,6 +90,9 @@ def create_app(
 
     def service() -> CampaignService:
         return app.state.service
+
+    def visual_bindings() -> VisualBindingManifest:
+        return app.state.visual_bindings
 
     async def state_for(campaign_id: str) -> WorldState:
         try:
@@ -149,6 +164,33 @@ def create_app(
         return ObservationEnvelope(
             observation=await observation_for(campaign_id, actor_id)
         )
+
+    @v1.get(
+        "/campaigns/{campaign_id}/visual",
+        operation_id="v1_campaign_visual",
+    )
+    async def v1_campaign_visual(
+        campaign_id: str,
+        actor_id: str | None = Query(default=None),
+    ) -> dict[str, object]:
+        observation = await observation_for(campaign_id, actor_id)
+        visual = visual_snapshot_from_observation(observation, visual_bindings())
+        return {"visual": visual.model_dump(mode="json")}
+
+    @v1.get(
+        "/campaigns/{campaign_id}/presentation",
+        operation_id="v1_campaign_presentation",
+    )
+    async def v1_campaign_presentation(
+        campaign_id: str,
+        after: int = Query(default=0, ge=0),
+    ) -> dict[str, object]:
+        events = await events_for(campaign_id, after)
+        batches = [
+            presentation_hints_for_event(event, visual_bindings()).model_dump(mode="json")
+            for event in events
+        ]
+        return {"campaign_id": campaign_id, "batches": batches}
 
     @v1.get(
         "/campaigns/{campaign_id}/events",
