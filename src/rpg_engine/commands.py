@@ -14,10 +14,34 @@ class CreateEntityCommand(StrictModel):
     entity: Entity
 
 
+class SpawnNpcCommand(StrictModel):
+    type: Literal["spawn_npc"] = "spawn_npc"
+    template_id: str
+    entity_id: str
+    location_id: str
+
+
 class MoveActorCommand(StrictModel):
     type: Literal["move_actor"] = "move_actor"
     actor_id: str
     position: Position
+
+
+class ExploreLocationCommand(StrictModel):
+    type: Literal["explore_location"] = "explore_location"
+    actor_id: str
+
+
+class SearchLocationCommand(StrictModel):
+    type: Literal["search_location"] = "search_location"
+    actor_id: str
+    ability: Ability = Ability.WISDOM
+
+
+class TravelCommand(StrictModel):
+    type: Literal["travel"] = "travel"
+    actor_id: str
+    destination_id: str
 
 
 class RollCheckCommand(StrictModel):
@@ -88,9 +112,76 @@ class UseReactionCommand(StrictModel):
     reaction_id: str
 
 
+class LootContainerCommand(StrictModel):
+    type: Literal["loot_container"] = "loot_container"
+    actor_id: str
+    container_id: str
+    item_ids: list[str] | None = None
+    take_currency: bool = True
+
+
+class EquipItemCommand(StrictModel):
+    type: Literal["equip_item"] = "equip_item"
+    actor_id: str
+    item_id: str
+
+
+class UnequipItemCommand(StrictModel):
+    type: Literal["unequip_item"] = "unequip_item"
+    actor_id: str
+    item_id: str
+
+
+class StartDialogueCommand(StrictModel):
+    type: Literal["start_dialogue"] = "start_dialogue"
+    actor_id: str
+    npc_id: str
+    dialogue_id: str | None = None
+
+
+class ChooseDialogueOptionCommand(StrictModel):
+    type: Literal["choose_dialogue_option"] = "choose_dialogue_option"
+    actor_id: str
+    session_id: str
+    option_id: str
+
+
+class StartQuestCommand(StrictModel):
+    type: Literal["start_quest"] = "start_quest"
+    actor_id: str
+    quest_id: str
+
+
+class AdvanceQuestCommand(StrictModel):
+    type: Literal["advance_quest"] = "advance_quest"
+    actor_id: str
+    quest_id: str
+    trigger: str
+
+
+class BuyItemCommand(StrictModel):
+    type: Literal["buy_item"] = "buy_item"
+    actor_id: str
+    merchant_id: str
+    item_id: str
+    quantity: int = Field(default=1, ge=1, le=1000)
+
+
+class SellItemCommand(StrictModel):
+    type: Literal["sell_item"] = "sell_item"
+    actor_id: str
+    merchant_id: str
+    item_id: str
+    quantity: int = Field(default=1, ge=1, le=1000)
+
+
 Command = Annotated[
     CreateEntityCommand
+    | SpawnNpcCommand
     | MoveActorCommand
+    | ExploreLocationCommand
+    | SearchLocationCommand
+    | TravelCommand
     | RollCheckCommand
     | RollSavingThrowCommand
     | AttackTargetCommand
@@ -100,7 +191,16 @@ Command = Annotated[
     | EndEncounterCommand
     | AdvanceTimeCommand
     | EndTurnCommand
-    | UseReactionCommand,
+    | UseReactionCommand
+    | LootContainerCommand
+    | EquipItemCommand
+    | UnequipItemCommand
+    | StartDialogueCommand
+    | ChooseDialogueOptionCommand
+    | StartQuestCommand
+    | AdvanceQuestCommand
+    | BuyItemCommand
+    | SellItemCommand,
     Field(discriminator="type"),
 ]
 

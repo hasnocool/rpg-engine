@@ -1,0 +1,16 @@
+id: northern_road
+name: Clear the Northern Road
+description: Investigate the old northern road and report what you find.
+initial_state: offered
+states: [offered, investigating, ready_to_report, complete]
+terminal_states: [complete]
+transitions:
+  - from_state: offered
+    trigger: accept
+    to_state: investigating
+  - from_state: investigating
+    trigger: road_found
+    to_state: ready_to_report
+  - from_state: ready_to_report
+    trigger: report_back
+    to_state: complete

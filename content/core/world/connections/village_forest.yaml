@@ -1,0 +1,6 @@
+id: village_forest
+from_location_id: village
+to_location_id: forest
+travel_minutes: 30
+bidirectional: true
+hidden: false

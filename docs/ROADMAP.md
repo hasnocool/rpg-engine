@@ -34,7 +34,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - tactical event replay coverage
 - v0.1 compatibility outside encounters
 
-## v0.3 — Adventure Engine (next)
+## v0.3 — Adventure Engine (implemented)
 
 - graph-based world maps and transitions
 - exploration/search/discovery
@@ -45,7 +45,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - merchants and transactions
 - travel commands/events
 
-## v0.4 — Living World
+## v0.4 — Living World (next)
 
 - calendar and scheduled world jobs
 - weather state

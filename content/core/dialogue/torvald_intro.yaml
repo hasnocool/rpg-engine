@@ -1,0 +1,55 @@
+id: torvald_intro
+start_node_id: greeting
+nodes:
+  greeting:
+    id: greeting
+    text: The blacksmith looks up from the forge.
+    options:
+      - id: ask_work
+        text: Any work that needs doing?
+        next_node_id: work
+        quest_actions:
+          - type: start
+            quest_id: northern_road
+      - id: persuade
+        text: I heard you pay well for dangerous work.
+        check:
+          ability: charisma
+          dc: 12
+        success_node_id: work
+        failure_node_id: greeting
+      - id: report_work
+        text: I have news about the northern road.
+        next_node_id: report
+        requires_quest_states:
+          northern_road: [ready_to_report]
+      - id: goodbye
+        text: Goodbye.
+        end_dialogue: true
+  work:
+    id: work
+    text: The northern road has gone quiet. Find out why.
+    options:
+      - id: accept_work
+        text: I will investigate it.
+        next_node_id: greeting
+        quest_actions:
+          - type: trigger
+            quest_id: northern_road
+            trigger: accept
+      - id: leave
+        text: I will think about it.
+        end_dialogue: true
+  report:
+    id: report
+    text: Tell me what you found on the old road.
+    options:
+      - id: report_findings
+        text: I found the route and the ruins beyond it.
+        end_dialogue: true
+        requires_quest_states:
+          northern_road: [ready_to_report]
+        quest_actions:
+          - type: trigger
+            quest_id: northern_road
+            trigger: report_back

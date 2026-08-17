@@ -10,9 +10,12 @@ from rpg_engine.models import (
     Ability,
     ActionBudget,
     ActiveEffect,
+    ContainerState,
+    DialogueSession,
     EncounterState,
     Entity,
     Position,
+    QuestProgress,
     ReactionOffer,
     StrictModel,
 )
@@ -232,8 +235,159 @@ class ReactionUsedEvent(EventBase):
     reaction_id: str
 
 
+class NpcSpawnedEvent(EventBase):
+    type: Literal["npc_spawned"] = "npc_spawned"
+    template_id: str
+    entity: Entity
+
+
+class LocationDiscoveredEvent(EventBase):
+    type: Literal["location_discovered"] = "location_discovered"
+    actor_id: str
+    location_id: str
+
+
+class LocationExploredEvent(EventBase):
+    type: Literal["location_explored"] = "location_explored"
+    actor_id: str
+    location_id: str
+
+
+class LocationSearchedEvent(EventBase):
+    type: Literal["location_searched"] = "location_searched"
+    actor_id: str
+    location_id: str
+    ability: Ability
+    die_roll: int
+    modifier: int
+    modifiers: list[Modifier] = Field(default_factory=list)
+    total: int
+
+
+class DiscoveryRevealedEvent(EventBase):
+    type: Literal["discovery_revealed"] = "discovery_revealed"
+    actor_id: str
+    discovery_id: str
+    location_ids: list[str] = Field(default_factory=list)
+    connection_ids: list[str] = Field(default_factory=list)
+    container_ids: list[str] = Field(default_factory=list)
+
+
+class TravelCompletedEvent(EventBase):
+    type: Literal["travel_completed"] = "travel_completed"
+    actor_id: str
+    connection_id: str
+    from_location_id: str
+    to_location_id: str
+    minutes: int
+    position: Position
+    time_minutes: int
+
+
+class ContainerCreatedEvent(EventBase):
+    type: Literal["container_created"] = "container_created"
+    container: ContainerState
+
+
+class ContainerLootedEvent(EventBase):
+    type: Literal["container_looted"] = "container_looted"
+    actor_id: str
+    container_id: str
+    item_ids: list[str] = Field(default_factory=list)
+    currency: dict[str, int] = Field(default_factory=dict)
+    actor_item_ids_after: list[str]
+    actor_currency_after: dict[str, int]
+    container_item_ids_after: list[str]
+    container_currency_after: dict[str, int]
+
+
+class ItemEquippedEvent(EventBase):
+    type: Literal["item_equipped"] = "item_equipped"
+    actor_id: str
+    item_id: str
+    slot: str
+    equipment_after: dict[str, str]
+    equipped_item_ids_after: list[str]
+
+
+class ItemUnequippedEvent(EventBase):
+    type: Literal["item_unequipped"] = "item_unequipped"
+    actor_id: str
+    item_id: str
+    slot: str
+    equipment_after: dict[str, str]
+    equipped_item_ids_after: list[str]
+
+
+class DialogueStartedEvent(EventBase):
+    type: Literal["dialogue_started"] = "dialogue_started"
+    session: DialogueSession
+
+
+class DialogueAdvancedEvent(EventBase):
+    type: Literal["dialogue_advanced"] = "dialogue_advanced"
+    session_id: str
+    option_id: str
+    from_node_id: str
+    to_node_id: str
+
+
+class DialogueEndedEvent(EventBase):
+    type: Literal["dialogue_ended"] = "dialogue_ended"
+    session_id: str
+    actor_id: str
+    npc_id: str
+
+
+class QuestStartedEvent(EventBase):
+    type: Literal["quest_started"] = "quest_started"
+    actor_id: str
+    progress: QuestProgress
+
+
+class QuestAdvancedEvent(EventBase):
+    type: Literal["quest_advanced"] = "quest_advanced"
+    actor_id: str
+    quest_id: str
+    trigger: str
+    from_state: str
+    to_state: str
+    completed: bool
+
+
+class TransactionCompletedEvent(EventBase):
+    type: Literal["transaction_completed"] = "transaction_completed"
+    buyer_id: str
+    seller_id: str
+    item_id: str
+    quantity: int
+    currency: str
+    unit_price: int
+    total: int
+    buyer_item_ids_after: list[str]
+    seller_item_ids_after: list[str]
+    buyer_balance_after: int
+    seller_balance_after: int
+
+
 Event = Annotated[
     EntityCreatedEvent
+    | NpcSpawnedEvent
+    | LocationDiscoveredEvent
+    | LocationExploredEvent
+    | LocationSearchedEvent
+    | DiscoveryRevealedEvent
+    | TravelCompletedEvent
+    | ContainerCreatedEvent
+    | ContainerLootedEvent
+    | ItemEquippedEvent
+    | ItemUnequippedEvent
+    | DialogueStartedEvent
+    | DialogueAdvancedEvent
+    | DialogueEndedEvent
+    | QuestStartedEvent
+    | QuestAdvancedEvent
+    | TransactionCompletedEvent
     | ActorMovedEvent
     | CheckRolledEvent
     | SavingThrowRolledEvent

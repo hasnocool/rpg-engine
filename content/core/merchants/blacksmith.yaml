@@ -1,0 +1,6 @@
+id: blacksmith
+currency: gold
+stock_item_ids: [longsword, longsword, healing_tonic]
+funds: 100
+sell_multiplier: 1.0
+buy_multiplier: 0.5

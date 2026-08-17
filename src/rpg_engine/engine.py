@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rpg_engine.adventure import AdventureError, AdventureRuntime
 from rpg_engine.commands import (
     AdvanceTimeCommand,
     ApplyAreaEffectCommand,
@@ -63,7 +64,7 @@ from rpg_engine.models import (
 from rpg_engine.resolution import ModifierPipeline, ResolutionContext, ResolutionKind
 from rpg_engine.rules.base import RulesRuntime
 from rpg_engine.rules.d20 import D20RulesRuntime
-from rpg_engine.spatial import GridSpatialAdapter, SpatialAdapter, TargetShape, TargetingContract
+from rpg_engine.spatial import GridSpatialAdapter, SpatialAdapter, TargetingContract, TargetShape
 
 
 class SimulationError(ValueError):
@@ -88,6 +89,9 @@ class SimulationEngine:
         self.rng = DeterministicRNG(world.seed, world.rng_counters)
         self.effects = EffectPipeline()
         self.modifiers = ModifierPipeline()
+        self.adventure = AdventureRuntime(
+            world, content=self.content, rules=self.rules, rng=self.rng
+        )
 
     def _entity(self, entity_id: str) -> Entity:
         try:
@@ -664,9 +668,7 @@ class SimulationEngine:
             )
             for target_id in selected_ids:
                 raw_events.extend(
-                    self._apply_effect_to_target(
-                        effect, self._entity(target_id), source
-                    )
+                    self._apply_effect_to_target(effect, self._entity(target_id), source)
                 )
 
         elif isinstance(command, AdvanceTimeCommand):
@@ -745,6 +747,12 @@ class SimulationEngine:
                     reaction_id=command.reaction_id,
                 )
             )
+
+        elif self.adventure.handles(command):
+            try:
+                raw_events = self.adventure.execute(command)
+            except AdventureError as exc:
+                raise SimulationError(str(exc)) from exc
 
         else:
             raise SimulationError(f"unsupported command: {type(command).__name__}")

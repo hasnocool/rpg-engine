@@ -1,0 +1,7 @@
+id: supply_crate
+name: Village Supply Crate
+location_id: village
+item_ids: [healing_tonic]
+currency:
+  gold: 5
+locked: false

@@ -1,34 +1,31 @@
 # rpg-engine
 
-A **headless, deterministic, event-driven tabletop RPG simulation engine** for Python 3.12+.
+A **headless, deterministic, event-driven RPG simulation engine** for Python 3.12+.
 
 The authoritative simulation is presentation-agnostic. CLI, TUI, web, Discord, 2D, 3D, AI, and
 multiplayer clients issue the same commands and consume the same immutable events.
 
-> The built-in `d20` runtime is a generic example ruleset. This repository does not bundle
-> proprietary tabletop rulebooks or copyrighted game content. Licensed, SRD-compatible, original,
-> or homebrew rules/content belong in separate ruleset plugins and content packs.
+> The built-in `d20` runtime and `content/core` pack are original generic examples. This repository
+> does not bundle proprietary tabletop rulebooks or copyrighted campaign content. Licensed,
+> SRD-compatible, original, or homebrew rules/content belong in separate plugins and packs.
 
-## Current milestone: v0.2 Tactical RPG
+## Current milestone: v0.3 Adventure Engine
 
-v0.2 builds a tactical authority layer on the deterministic v0.1 core:
+v0.3 adds a persistent adventure layer on top of the v0.1 deterministic core and v0.2 tactical
+runtime:
 
-- persisted encounter aggregates with deterministic initiative ordering
-- round/turn cursor and authoritative active-actor validation
-- action, bonus-action, reaction, and movement budgets
-- typed d20 resolution contexts/outcomes
-- modifier pipelines with source/provenance audit trails
-- saving throws
-- trigger/reaction hook contracts and persisted reaction windows
-- generic resource pools and concentration state
-- resistance, immunity, and vulnerability damage transforms
-- timed effects with deterministic expiry
-- single-target and area-targeting contracts
-- grid and graph spatial adapter interfaces
-- event-replay reconstruction of tactical state
-- v0.1 command compatibility outside active encounters
+- graph-based world locations and travel connections
+- hidden connections and actor-specific discovery knowledge
+- deterministic exploration and location search checks
+- data-driven NPC templates
+- persistent containers, looting, equipment slots, and currency
+- dialogue graphs with requirements and d20 checks
+- event-sourced quest state machines
+- data-driven merchant profiles and authoritative buy/sell transactions
+- replay-safe travel, commerce, dialogue, inventory, knowledge, and quest state
+- compatibility with all v0.1/v0.2 commands
 
-The engine still knows nothing about pixels, meshes, terminal colors, WebGL, cameras, or input
+The engine still knows nothing about pixels, meshes, terminal colors, cameras, WebGL, or input
 devices.
 
 ## Architecture
@@ -38,35 +35,35 @@ Human / AI / Client
         |
       Command
         v
-+---------------------------+
-| CampaignService           | async per-campaign authority
-| +-----------------------+ |
-| | SimulationEngine      | |
-| | encounters / rules    | |
-| | effects / hooks / RNG | |
-| +-----------+-----------+ |
-+-------------|-------------+
-              | Events
-      +-------+---------+
-      |                 |
++--------------------------------+
+| CampaignService                | async per-campaign authority
+| +----------------------------+ |
+| | SimulationEngine           | |
+| | + Tactical systems         | |
+| | + AdventureRuntime         | |
+| | + Rules / Hooks / RNG      | |
+| +-------------+--------------+ |
++---------------|----------------+
+                | Events
+        +-------+---------+
+        |                 |
  SQLite/event log   WebSocket/UI
 ```
 
-Rules and geometry remain replaceable contracts:
+The world itself is content-driven:
 
 ```text
-SimulationEngine
-  |- RulesRuntime
-  |    |- d20 reference runtime
-  |    `- custom rulesets
-  |
-  |- SpatialAdapter
-  |    |- GridSpatialAdapter
-  |    `- GraphSpatialAdapter
-  |
-  `- HookRegistry
-       `- ruleset/content reaction hooks
+Location ---- Connection ---- Location
+   |                           |
+Discovery                    NPC template
+   |                           |
+Container                 Dialogue / Merchant
+                               |
+                              Quest
 ```
+
+Renderers can attach coordinates, scenes, sprites, meshes, or maps without changing the logical
+world graph.
 
 ## Install
 
@@ -83,121 +80,198 @@ rpg-engine demo --seed 918392482
 rpg-engine serve --host 127.0.0.1 --port 8000
 ```
 
-## Tactical command examples
+Commands work through the same REST and WebSocket interfaces introduced in v0.1.
 
-Start an encounter:
+## Adventure command examples
+
+Explore the actor's current logical location:
 
 ```json
 {
-  "type": "start_encounter",
-  "encounter_id": "bridge-fight",
-  "participant_ids": ["fighter-1", "goblin-1"]
+  "type": "explore_location",
+  "actor_id": "fighter-1"
 }
 ```
 
-Attack on the active turn:
+Search for hidden content:
 
 ```json
 {
-  "type": "attack_target",
-  "attacker_id": "fighter-1",
-  "target_id": "goblin-1",
-  "weapon_id": "longsword"
-}
-```
-
-Roll a saving throw:
-
-```json
-{
-  "type": "roll_saving_throw",
+  "type": "search_location",
   "actor_id": "fighter-1",
-  "ability": "dexterity",
-  "dc": 13,
-  "source_id": "trap-1"
+  "ability": "wisdom"
 }
 ```
 
-End the current turn:
+Travel over an authoritative world connection:
 
 ```json
 {
-  "type": "end_turn",
+  "type": "travel",
   "actor_id": "fighter-1",
-  "encounter_id": "bridge-fight"
+  "destination_id": "forest"
 }
 ```
 
-The same payloads work through REST or the campaign WebSocket command channel.
+Spawn an NPC from content:
 
-## Determinism
+```json
+{
+  "type": "spawn_npc",
+  "template_id": "blacksmith",
+  "entity_id": "torvald",
+  "location_id": "village"
+}
+```
 
-Randomness uses named counter-based streams:
+Start a conversation:
+
+```json
+{
+  "type": "start_dialogue",
+  "actor_id": "fighter-1",
+  "npc_id": "torvald"
+}
+```
+
+Buy from an authoritative merchant inventory:
+
+```json
+{
+  "type": "buy_item",
+  "actor_id": "fighter-1",
+  "merchant_id": "torvald",
+  "item_id": "longsword",
+  "quantity": 1
+}
+```
+
+## Determinism and replay
+
+Randomness still uses named counter-based streams:
 
 ```text
 campaign seed + stream name + stream counter -> deterministic roll
 ```
 
-The counters are state, and events preserve post-command counter state. Snapshot + event replay
-therefore restores both the visible world and the future RNG position.
+Adventure search and dialogue checks use the same modifier/provenance pipeline as tactical d20
+resolution. Events preserve the post-command RNG counters.
 
-Initiative ordering is deterministic too: total descending, modifier descending, actor ID ascending.
+Adventure events also preserve enough resulting state to replay historical decisions without
+re-running current content rules. For example, a commerce event stores the actual historical price,
+transferred quantity, and resulting inventories/balances. Changing a merchant price tomorrow does
+not rewrite yesterday's event history.
 
-## Tactical authority
+## World graph and discovery
 
-Inside an active encounter:
+`WorldLocationSpec` and `WorldConnectionSpec` define the logical world independently of rendering.
+Connections can be bidirectional, timed, tagged, and hidden.
 
-- only the active actor may spend action, bonus-action, or movement budget
-- reactions may be spent out of turn only from an authoritative reaction window
-- weapon/effect range is validated by the configured spatial adapter
-- movement cost is computed by the spatial adapter, never trusted from the client
-- resource costs are checked and spent atomically before effects resolve
-- damage traits are applied before HP mutation
-- timed effects and concentration are stateful and event-sourced
+Hidden connections are unusable until an authoritative discovery reveals them. Knowledge is stored
+per actor:
 
-Outside an encounter, v0.1 commands remain usable without tactical budget requirements.
+```text
+locations
+connections
+discoveries
+containers
+```
+
+A search command performs one deterministic d20 resolution and can reveal every matching discovery
+whose DC is met. Discoveries can reveal locations, graph connections, and loot containers.
+
+## NPCs, dialogue, and quests
+
+NPCs are instantiated from data-driven templates. Templates can bind an entity to a dialogue graph
+and merchant profile.
+
+Dialogue options can include:
+
+- quest-state requirements
+- d20 checks with success/failure branches
+- quest start actions
+- quest transition triggers
+- explicit conversation termination
+
+Quests are state machines with declared states and trigger-driven transitions. Invalid transitions
+are rejected by the authoritative engine rather than being invented by a client or narrator.
+
+## Inventory and economy
+
+v0.3 adds:
+
+- persistent container state
+- authoritative loot transfer
+- equipment slots with equip/unequip events
+- item values and tags
+- per-entity currency balances
+- merchant stock and funds
+- buy/sell multipliers and price overrides
+- exact transaction snapshots for event replay
+
+Adventure inventory/commerce actions are rejected during active tactical encounters so they cannot
+bypass v0.2 action economy.
 
 ## Content remains data-driven
 
-v0.2 content schemas support:
+A world connection is ordinary YAML:
 
 ```yaml
-id: focus_guard
-name: Focus Guard
-action_cost: bonus_action
-duration_turns: 3
-concentration: true
-resource_costs:
-  focus: 1
-targeting:
-  shape: single
-  max_range: 0
-operations:
-  - type: add_condition
-    condition: focused
+id: village_forest
+from_location_id: village
+to_location_id: forest
+travel_minutes: 30
+bidirectional: true
+hidden: false
 ```
 
-Area effects use the same effect pipeline with a targeting contract rather than renderer geometry.
+A quest is also data:
+
+```yaml
+id: northern_road
+name: Clear the Northern Road
+initial_state: offered
+states: [offered, investigating, ready_to_report, complete]
+terminal_states: [complete]
+transitions:
+  - from_state: offered
+    trigger: accept
+    to_state: investigating
+```
+
+The included core examples provide a tiny original village/forest/ruins loop, a blacksmith NPC,
+merchant inventory, dialogue, discoveries, containers, and a quest for automated testing.
 
 ## Repository layout
 
 ```text
 src/rpg_engine/
 |- api/              # FastAPI + WebSocket adapter
-|- content/          # data-driven content schemas/loaders
+|- content/          # content schemas/loaders
 |- persistence/      # async event/snapshot storage
 |- rules/            # ruleset interface + generic d20 runtime
+|- adventure.py      # v0.3 world/dialogue/quest/inventory/economy authority
 |- commands.py       # intent contracts
 |- events.py         # immutable facts
-|- models.py         # world/entity/encounter state
+|- models.py         # persistent world/entity/tactical/adventure state
 |- resolution.py     # modifier pipeline + typed outcomes
-|- spatial.py        # grid/graph targeting/movement contracts
+|- spatial.py        # tactical grid/graph movement/targeting contracts
 |- hooks.py          # trigger/reaction extension contracts
 |- effects.py        # composable effect execution
-|- engine.py         # authoritative processor
+|- engine.py         # authoritative command processor
 |- reducer.py        # replay reconstruction
 |- service.py        # async concurrency/persistence boundary
 `- cli.py            # text adapter
+
+content/core/
+|- world/            # locations, connections, discoveries
+|- npcs/
+|- dialogue/
+|- quests/
+|- merchants/
+|- containers/
+|- items/
+`- effects/
 ```
 
 ## Test
@@ -209,6 +283,6 @@ pytest --cov=rpg_engine --cov-report=term-missing
 
 ## Next milestone
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md). The next milestone is **v0.3 Adventure Engine**:
-graph-based world transitions, exploration/discovery, inventory containers/equipment, dialogue,
-quests, merchants, NPC templates, and travel.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md). The next milestone is **v0.4 Living World**: calendar
+scheduling, weather, NPC schedules, factions/reputation, settlement economy, off-screen encounter
+resolution, rumors/dynamic quests, and regeneration/ecology hooks.
