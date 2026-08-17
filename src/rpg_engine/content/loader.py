@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 import yaml
 from pydantic import BaseModel
@@ -25,8 +25,6 @@ from rpg_engine.content.models import (
 )
 from rpg_engine.models import WeaponSpec
 
-_ModelT = TypeVar("_ModelT", bound=BaseModel)
-
 
 def _read_yaml(path: Path) -> dict[str, Any]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -35,7 +33,9 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _load_directory(root: Path, relative: str, model: type[_ModelT]) -> list[_ModelT]:
+def _load_directory[ModelT: BaseModel](
+    root: Path, relative: str, model: type[ModelT]
+) -> list[ModelT]:
     directory = root / relative
     if not directory.exists():
         return []
@@ -79,7 +79,7 @@ def _weapon_from_payload(payload: dict[str, Any]) -> WeaponSpec | None:
 
 
 def _store_unique(target: dict[str, Any], item: BaseModel, *, category: str) -> None:
-    item_id = str(getattr(item, "id"))
+    item_id = str(item.model_dump()["id"])
     if item_id in target:
         raise ValueError(f"duplicate {category} id: {item_id}")
     target[item_id] = item
