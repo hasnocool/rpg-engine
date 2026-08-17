@@ -389,7 +389,6 @@ class SimulationEngine:
 
     def execute(self, command: Command) -> list[Event]:
         raw_events: list[EventBase]
-        encounter: EncounterState | None
 
         if isinstance(command, CreateEntityCommand):
             if command.entity.id in self.world.entities:

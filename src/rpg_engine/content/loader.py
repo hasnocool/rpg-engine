@@ -10,16 +10,24 @@ import yaml
 from pydantic import BaseModel
 
 from rpg_engine.content.models import (
+    CalendarSpec,
     ContainerTemplateSpec,
     ContentManifest,
     ContentRegistry,
     DialogueSpec,
     DiscoverySpec,
+    DynamicQuestTemplateSpec,
     EffectSpec,
+    FactionSpec,
     ItemSpec,
     MerchantSpec,
+    NpcScheduleSpec,
     NpcTemplateSpec,
     QuestSpec,
+    ResourceNodeSpec,
+    RumorTemplateSpec,
+    SettlementSpec,
+    WeatherProfileSpec,
     WorldConnectionSpec,
     WorldLocationSpec,
 )
@@ -111,7 +119,10 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                 f"container {container.id} references unknown location: {container.location_id}"
             )
         _require_ids(
-            container.item_ids, registry.items, owner=f"container {container.id}", category="items"
+            container.item_ids,
+            registry.items,
+            owner=f"container {container.id}",
+            category="items",
         )
         if any(amount < 0 for amount in container.currency.values()):
             raise ValueError(f"container {container.id} has negative currency")
@@ -167,6 +178,10 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
             raise ValueError(
                 f"NPC template {template.id} references unknown merchant: {template.merchant_id}"
             )
+        if template.schedule_id is not None and template.schedule_id not in registry.npc_schedules:
+            raise ValueError(
+                f"NPC template {template.id} references unknown schedule: {template.schedule_id}"
+            )
 
     for dialogue in registry.dialogues.values():
         for node_key, node in dialogue.nodes.items():
@@ -221,6 +236,91 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                                 f"quest trigger {action.trigger!r} for {action.quest_id}"
                             )
 
+    for schedule in registry.npc_schedules.values():
+        _require_ids(
+            [entry.location_id for entry in schedule.entries],
+            registry.locations,
+            owner=f"NPC schedule {schedule.id}",
+            category="locations",
+        )
+
+    for faction in registry.factions.values():
+        _require_ids(
+            set(faction.base_relations),
+            registry.factions,
+            owner=f"faction {faction.id}",
+            category="factions",
+        )
+        if faction.id in faction.base_relations:
+            raise ValueError(f"faction {faction.id} cannot define a relation with itself")
+        for other_id, value in faction.base_relations.items():
+            reciprocal = registry.factions[other_id].base_relations.get(faction.id)
+            if reciprocal is not None and reciprocal != value:
+                raise ValueError(
+                    f"faction relation mismatch: {faction.id}/{other_id} "
+                    f"declares {value} and {reciprocal}"
+                )
+
+    for settlement in registry.settlements.values():
+        _require_ids(
+            [settlement.location_id],
+            registry.locations,
+            owner=f"settlement {settlement.id}",
+            category="locations",
+        )
+        if settlement.faction_id is not None:
+            _require_ids(
+                [settlement.faction_id],
+                registry.factions,
+                owner=f"settlement {settlement.id}",
+                category="factions",
+            )
+
+    regions = {location.region for location in registry.locations.values() if location.region}
+    for profile in registry.weather_profiles.values():
+        if profile.region_id not in regions:
+            raise ValueError(
+                f"weather profile {profile.id} references unknown region: {profile.region_id}"
+            )
+
+    for template in registry.dynamic_quest_templates.values():
+        _require_ids(
+            template.target_location_ids,
+            registry.locations,
+            owner=f"dynamic quest template {template.id}",
+            category="locations",
+        )
+
+    for rumor in registry.rumor_templates.values():
+        _require_ids(
+            [rumor.location_id],
+            registry.locations,
+            owner=f"rumor {rumor.id}",
+            category="locations",
+        )
+        if (
+            rumor.quest_template_id is not None
+            and rumor.quest_template_id not in registry.dynamic_quest_templates
+        ):
+            raise ValueError(
+                f"rumor {rumor.id} references unknown dynamic quest template: "
+                f"{rumor.quest_template_id}"
+            )
+
+    for node in registry.resource_nodes.values():
+        _require_ids(
+            [node.location_id],
+            registry.locations,
+            owner=f"resource node {node.id}",
+            category="locations",
+        )
+        _require_ids(
+            [node.item_id],
+            registry.items,
+            owner=f"resource node {node.id}",
+            category="items",
+        )
+
     return registry
 
 
@@ -242,10 +342,10 @@ def load_content_pack(root: Path) -> ContentRegistry:
 
     for effect in _load_directory(root, "effects", EffectSpec):
         _store_unique(registry.effects, effect, category="effect")
-    for container_template in _load_directory(root, "containers", ContainerTemplateSpec):
-        _store_unique(registry.containers, container_template, category="container")
-    for npc_template in _load_directory(root, "npcs", NpcTemplateSpec):
-        _store_unique(registry.npc_templates, npc_template, category="NPC template")
+    for template in _load_directory(root, "containers", ContainerTemplateSpec):
+        _store_unique(registry.containers, template, category="container")
+    for template in _load_directory(root, "npcs", NpcTemplateSpec):
+        _store_unique(registry.npc_templates, template, category="NPC template")
     for dialogue in _load_directory(root, "dialogue", DialogueSpec):
         _store_unique(registry.dialogues, dialogue, category="dialogue")
     for quest in _load_directory(root, "quests", QuestSpec):
@@ -258,6 +358,24 @@ def load_content_pack(root: Path) -> ContentRegistry:
         _store_unique(registry.connections, connection, category="connection")
     for discovery in _load_directory(root, "world/discoveries", DiscoverySpec):
         _store_unique(registry.discoveries, discovery, category="discovery")
+    for calendar in _load_directory(root, "world/calendars", CalendarSpec):
+        _store_unique(registry.calendars, calendar, category="calendar")
+    for profile in _load_directory(root, "weather", WeatherProfileSpec):
+        _store_unique(registry.weather_profiles, profile, category="weather profile")
+    for schedule in _load_directory(root, "schedules", NpcScheduleSpec):
+        _store_unique(registry.npc_schedules, schedule, category="NPC schedule")
+    for faction in _load_directory(root, "factions", FactionSpec):
+        _store_unique(registry.factions, faction, category="faction")
+    for settlement in _load_directory(root, "settlements", SettlementSpec):
+        _store_unique(registry.settlements, settlement, category="settlement")
+    for template in _load_directory(root, "dynamic_quests", DynamicQuestTemplateSpec):
+        _store_unique(
+            registry.dynamic_quest_templates, template, category="dynamic quest template"
+        )
+    for rumor in _load_directory(root, "rumors", RumorTemplateSpec):
+        _store_unique(registry.rumor_templates, rumor, category="rumor")
+    for node in _load_directory(root, "ecology", ResourceNodeSpec):
+        _store_unique(registry.resource_nodes, node, category="resource node")
     return validate_content_registry(registry)
 
 

@@ -1,0 +1,19 @@
+id: riverdale
+name: Riverdale
+location_id: village
+faction_id: riverdale
+population: 180
+treasury: 1200
+prosperity: 1.0
+initial_stocks:
+  food: 80
+  timber: 40
+production_per_tick:
+  food: 12
+  timber: 6
+consumption_per_tick:
+  food: 10
+  timber: 2
+income_per_tick: 30
+expenses_per_tick: 18
+tick_interval_minutes: 360

@@ -5,65 +5,66 @@ A **headless, deterministic, event-driven RPG simulation engine** for Python 3.1
 The authoritative simulation is presentation-agnostic. CLI, TUI, web, Discord, 2D, 3D, AI, and
 multiplayer clients issue the same commands and consume the same immutable events.
 
-> The built-in `d20` runtime and `content/core` pack are original generic examples. This repository
-> does not bundle proprietary tabletop rulebooks or copyrighted campaign content. Licensed,
-> SRD-compatible, original, or homebrew rules/content belong in separate plugins and packs.
+> The built-in `d20` runtime and `content/core` pack are original generic examples. Proprietary
+> tabletop rulebooks or campaign content are not bundled.
 
-## Current milestone: v0.3 Adventure Engine
+## Current milestone: v0.8 Multiplayer
 
-v0.3 adds a persistent adventure layer on top of the v0.1 deterministic core and v0.2 tactical
-runtime:
+v0.8 adds a hosted multiplayer authority layer on top of the deterministic simulation and v0.7 AI
+Game Master systems:
 
-- graph-based world locations and travel connections
-- hidden connections and actor-specific discovery knowledge
-- deterministic exploration and location search checks
-- data-driven NPC templates
-- persistent containers, looting, equipment slots, and currency
-- dialogue graphs with requirements and d20 checks
-- event-sourced quest state machines
-- data-driven merchant profiles and authoritative buy/sell transactions
-- replay-safe travel, commerce, dialogue, inventory, knowledge, and quest state
-- compatibility with all v0.1/v0.2 commands
+- authenticated player accounts and expiring sessions
+- owner/player/spectator campaign roles
+- controlled-actor assignments and campaign parties
+- optimistic client command IDs with persisted idempotency receipts
+- execution-lease fencing for abandoned in-flight commands
+- reconnect/resume from persisted event cursors
+- spectator read-only access and conservative player event filtering
+- shared-database command/read/authentication rate limits
+- horizontal node heartbeats, rendezvous placement, leases, redirects, and failover
 
-The engine still knows nothing about pixels, meshes, terminal colors, cameras, WebGL, or input
-devices.
+The multiplayer layer coordinates **who may submit commands and how retries/reconnects are handled**.
+It does not bypass `CampaignService`, `SimulationEngine`, rules, hooks, RNG, or the immutable event
+log.
 
 ## Architecture
 
 ```text
-Human / AI / Client
-        |
-      Command
-        v
-+--------------------------------+
-| CampaignService                | async per-campaign authority
-| +----------------------------+ |
-| | SimulationEngine           | |
-| | + Tactical systems         | |
-| | + AdventureRuntime         | |
-| | + Rules / Hooks / RNG      | |
-| +-------------+--------------+ |
-+---------------|----------------+
-                | Events
-        +-------+---------+
-        |                 |
- SQLite/event log   WebSocket/UI
+Player / Spectator / AI / Client
+              |
+   bearer session + command ID
+              v
++-------------------------------------+
+| HostedCampaignService               |
+| + auth / membership / parties       |
+| + idempotency / rate limits         |
+| + reconnect / spectator filtering   |
+| + horizontal campaign placement     |
++------------------+------------------+
+                   |
+             typed Command
+                   v
++-------------------------------------+
+| CampaignService                     | async per-campaign authority
+| +---------------------------------+ |
+| | SimulationEngine                | |
+| | + Tactical engine              | |
+| | + AdventureRuntime             | |
+| | + TimelineScheduler            | |
+| | + LivingWorldRuntime           | |
+| | + AIGameMasterRuntime          | |
+| | + Rules / Hooks / RNG          | |
+| +----------------+----------------+ |
++------------------|------------------+
+                   | immutable Events
+           +-------+---------+
+           |                 |
+    SQLite/event log   REST/WebSocket
 ```
 
-The world itself is content-driven:
-
-```text
-Location ---- Connection ---- Location
-   |                           |
-Discovery                    NPC template
-   |                           |
-Container                 Dialogue / Merchant
-                               |
-                              Quest
-```
-
-Renderers can attach coordinates, scenes, sprites, meshes, or maps without changing the logical
-world graph.
+The scheduler and hosted layer remain async-safe. PBKDF2 and the synchronous SQLite multiplayer
+coordination operations run through `asyncio.to_thread`; heartbeat/reconnect waits use asyncio
+primitives rather than blocking sleeps.
 
 ## Install
 
@@ -73,206 +74,124 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-## Run
+## Run local/development authority
 
 ```bash
 rpg-engine demo --seed 918392482
 rpg-engine serve --host 127.0.0.1 --port 8000
 ```
 
-Commands work through the same REST and WebSocket interfaces introduced in v0.1.
+## Run the authenticated hosted multiplayer API
 
-## Adventure command examples
+```bash
+uvicorn rpg_engine.api.hosted:app --host 0.0.0.0 --port 8000
+```
 
-Explore the actor's current logical location:
+For a public deployment, put TLS in front of the hosted API and do not expose the legacy
+unauthenticated development adapter directly to the Internet.
+
+## Multiplayer command envelope
+
+Hosted clients send their normal typed command inside an optimistic command envelope:
 
 ```json
 {
-  "type": "explore_location",
-  "actor_id": "fighter-1"
+  "client_command_id": "web-7f15c1a1",
+  "command": {
+    "type": "move_actor",
+    "actor_id": "fighter-1",
+    "position": {"area": "village"}
+  }
 }
 ```
 
-Search for hidden content:
+The receipt key is `campaign_id + player_id + client_command_id`. A retry with the same canonical
+command replays the stored authoritative result without executing it again. Reusing the client ID
+for different intent is rejected.
 
-```json
-{
-  "type": "search_location",
-  "actor_id": "fighter-1",
-  "ability": "wisdom"
-}
+Clients can reconcile an optimistic command after reconnect with:
+
+```text
+GET /v1/campaigns/{campaign_id}/commands/{client_command_id}
 ```
 
-Travel over an authoritative world connection:
+## Reconnect and resume
 
-```json
-{
-  "type": "travel",
-  "actor_id": "fighter-1",
-  "destination_id": "forest"
-}
+The event log remains the source of truth:
+
+```text
+GET /v1/campaigns/{campaign_id}/events?after=418
+WS  /v1/campaigns/{campaign_id}/events/ws?after=418&token=...
 ```
 
-Spawn an NPC from content:
+The WebSocket first replays persisted events, then waits for new ones and emits heartbeat envelopes
+without changing the event cursor. The global cursor advances across filtered/hidden events so a
+player cannot become stuck replaying sequences they are not allowed to see.
 
-```json
-{
-  "type": "spawn_npc",
-  "template_id": "blacksmith",
-  "entity_id": "torvald",
-  "location_id": "village"
-}
+## Horizontal placement
+
+Each hosted node registers a unique `node_id` and routable `public_url`. Campaign ownership uses
+rendezvous hashing over live nodes plus persisted leases and monotonically increasing placement
+epochs. Expired nodes are removed from consideration and the next request deterministically fails
+over to a surviving node.
+
+Requests reaching a non-owner node receive HTTP 307 with the current placement. WebSocket clients
+receive a redirect envelope and reconnect to the owning node.
+
+The included `MultiplayerStore` is the SQLite reference coordination backend and is suitable for
+multiple processes sharing a local WAL database. Multi-host production deployments should use a
+shared coordination database with equivalent transactional semantics rather than SQLite over an
+unsafe network filesystem.
+
+## AI Game Master
+
+AI providers receive `AiObservation` rather than raw `WorldState`. Hidden connections, remote
+actors, unrelated inventories/resources, and other non-visible state are filtered before a provider
+runs.
+
+Reference implementations include `UtilityAgent`, `BehaviorTreeAgent`, and
+`DeterministicNarrator`. `AIGameMasterCoordinator` is asynchronous and serializes turns for the same
+actor without blocking the event loop.
+
+AI encounter/quest proposals are validated and persisted before activation. Accepted encounter
+proposals delegate to `StartEncounterCommand`; accepted quest proposals must reference a validated
+dynamic quest template and delegate to `GenerateDynamicQuestCommand`.
+
+## First-class time and Living World
+
+The same deterministic first-class timeline carries tactical readiness, delayed actions, effects,
+world events, NPC schedules, reaction windows, and idle pressure across these policies:
+
+```text
+turn_based
+timed_turn_based
+real_time
+real_time_with_pause
+hybrid
 ```
 
-Start a conversation:
-
-```json
-{
-  "type": "start_dialogue",
-  "actor_id": "fighter-1",
-  "npc_id": "torvald"
-}
-```
-
-Buy from an authoritative merchant inventory:
-
-```json
-{
-  "type": "buy_item",
-  "actor_id": "fighter-1",
-  "merchant_id": "torvald",
-  "item_id": "longsword",
-  "quantity": 1
-}
-```
+v0.4 Living World adds calendar/seasons, weather, NPC schedules, factions/reputation, settlement
+economy, off-screen encounters, rumors/dynamic quests, and renewable ecology.
 
 ## Determinism and replay
 
-Randomness still uses named counter-based streams:
+Randomness uses named counter-based streams:
 
 ```text
 campaign seed + stream name + stream counter -> deterministic roll
 ```
 
-Adventure search and dialogue checks use the same modifier/provenance pipeline as tactical d20
-resolution. Events preserve the post-command RNG counters.
+Game-state changes still flow through immutable events and reducers. Multiplayer sessions,
+idempotency receipts, rate-limit counters, party records, and placement leases are hosting state and
+are intentionally kept outside deterministic `WorldState`.
 
-Adventure events also preserve enough resulting state to replay historical decisions without
-re-running current content rules. For example, a commerce event stores the actual historical price,
-transferred quantity, and resulting inventories/balances. Changing a merchant price tomorrow does
-not rewrite yesterday's event history.
+## Documentation
 
-## World graph and discovery
-
-`WorldLocationSpec` and `WorldConnectionSpec` define the logical world independently of rendering.
-Connections can be bidirectional, timed, tagged, and hidden.
-
-Hidden connections are unusable until an authoritative discovery reveals them. Knowledge is stored
-per actor:
-
-```text
-locations
-connections
-discoveries
-containers
-```
-
-A search command performs one deterministic d20 resolution and can reveal every matching discovery
-whose DC is met. Discoveries can reveal locations, graph connections, and loot containers.
-
-## NPCs, dialogue, and quests
-
-NPCs are instantiated from data-driven templates. Templates can bind an entity to a dialogue graph
-and merchant profile.
-
-Dialogue options can include:
-
-- quest-state requirements
-- d20 checks with success/failure branches
-- quest start actions
-- quest transition triggers
-- explicit conversation termination
-
-Quests are state machines with declared states and trigger-driven transitions. Invalid transitions
-are rejected by the authoritative engine rather than being invented by a client or narrator.
-
-## Inventory and economy
-
-v0.3 adds:
-
-- persistent container state
-- authoritative loot transfer
-- equipment slots with equip/unequip events
-- item values and tags
-- per-entity currency balances
-- merchant stock and funds
-- buy/sell multipliers and price overrides
-- exact transaction snapshots for event replay
-
-Adventure inventory/commerce actions are rejected during active tactical encounters so they cannot
-bypass v0.2 action economy.
-
-## Content remains data-driven
-
-A world connection is ordinary YAML:
-
-```yaml
-id: village_forest
-from_location_id: village
-to_location_id: forest
-travel_minutes: 30
-bidirectional: true
-hidden: false
-```
-
-A quest is also data:
-
-```yaml
-id: northern_road
-name: Clear the Northern Road
-initial_state: offered
-states: [offered, investigating, ready_to_report, complete]
-terminal_states: [complete]
-transitions:
-  - from_state: offered
-    trigger: accept
-    to_state: investigating
-```
-
-The included core examples provide a tiny original village/forest/ruins loop, a blacksmith NPC,
-merchant inventory, dialogue, discoveries, containers, and a quest for automated testing.
-
-## Repository layout
-
-```text
-src/rpg_engine/
-|- api/              # FastAPI + WebSocket adapter
-|- content/          # content schemas/loaders
-|- persistence/      # async event/snapshot storage
-|- rules/            # ruleset interface + generic d20 runtime
-|- adventure.py      # v0.3 world/dialogue/quest/inventory/economy authority
-|- commands.py       # intent contracts
-|- events.py         # immutable facts
-|- models.py         # persistent world/entity/tactical/adventure state
-|- resolution.py     # modifier pipeline + typed outcomes
-|- spatial.py        # tactical grid/graph movement/targeting contracts
-|- hooks.py          # trigger/reaction extension contracts
-|- effects.py        # composable effect execution
-|- engine.py         # authoritative command processor
-|- reducer.py        # replay reconstruction
-|- service.py        # async concurrency/persistence boundary
-`- cli.py            # text adapter
-
-content/core/
-|- world/            # locations, connections, discoveries
-|- npcs/
-|- dialogue/
-|- quests/
-|- merchants/
-|- containers/
-|- items/
-`- effects/
-```
+- [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md) — v0.8 hosted multiplayer contract
+- [`docs/AI_GAME_MASTER.md`](docs/AI_GAME_MASTER.md) — v0.7 AI authority contract
+- [`docs/LIVING_WORLD.md`](docs/LIVING_WORLD.md) — v0.4 living-world systems
+- [`docs/ADVENTURE.md`](docs/ADVENTURE.md) — v0.3 adventure systems
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — milestone sequencing
 
 ## Test
 
@@ -283,6 +202,5 @@ pytest --cov=rpg_engine --cov-report=term-missing
 
 ## Next milestone
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md). The next milestone is **v0.4 Living World**: calendar
-scheduling, weather, NPC schedules, factions/reputation, settlement economy, off-screen encounter
-resolution, rumors/dynamic quests, and regeneration/ecology hooks.
+The next roadmap milestone is **v0.9 Creator Platform**: content-pack SDK/schema tooling, editors,
+rules plugin SDK, validation/lint tooling, and dependency/version constraints for mods.
