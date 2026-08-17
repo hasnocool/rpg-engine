@@ -23,7 +23,9 @@ v0.7 adds an advisory AI authority layer on top of the deterministic v0.4 Living
 - replay support for AI memories and proposal state
 
 The AI layer is intentionally model-provider neutral. Local models, hosted APIs, scripted agents, or
-future v0.5/v0.6 frontends can use the same protocols without becoming authoritative.
+the v0.5 frontend stack can use the same protocols without becoming authoritative.
+
+Latest merged milestone: v0.7 AI Game Master.
 
 The engine still knows nothing about pixels, meshes, terminal colors, cameras, WebGL, or input
 devices.

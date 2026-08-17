@@ -56,7 +56,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - resource harvesting, regeneration, and ecology hooks
 - full event/reducer replay coverage for living-world state
 
-## v0.5 — Multiple Frontends (parallel track)
+## v0.5 — Multiple Frontends (implemented)
 
 - interactive CLI
 - Rich/Textual TUI adapter
@@ -65,7 +65,7 @@ The project is intentionally staged so simulation depth is built before expensiv
 - resumable WebSocket event subscriptions
 - renderer-neutral observation/query API
 
-## v0.6 — Visual Adapters
+## v0.6 — Visual Adapters (planned)
 
 - Godot 2D adapter
 - Godot 3D adapter
