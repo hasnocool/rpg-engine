@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -56,10 +57,8 @@ def _atomic_write_json(path: Path, payload: object) -> None:
             os.fsync(handle.fileno())
         os.replace(temp_name, path)
     except BaseException:
-        try:
+        with suppress(FileNotFoundError):
             os.unlink(temp_name)
-        except FileNotFoundError:
-            pass
         raise
 
 
