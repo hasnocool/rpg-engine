@@ -92,6 +92,7 @@ class NpcTemplateSpec(StrictModel):
     entity: Entity
     dialogue_id: str | None = None
     merchant_id: str | None = None
+    schedule_id: str | None = None
 
 
 class DialogueCheckSpec(StrictModel):
@@ -183,6 +184,151 @@ class MerchantSpec(StrictModel):
     price_overrides: dict[str, int] = Field(default_factory=dict)
 
 
+class SeasonSpec(StrictModel):
+    name: str
+    start_day: int = Field(ge=1)
+
+
+class CalendarSpec(StrictModel):
+    id: str
+    minutes_per_day: int = Field(default=1440, gt=0)
+    days_per_year: int = Field(default=360, gt=0)
+    starting_year: int = Field(default=1, ge=1)
+    seasons: list[SeasonSpec] = Field(
+        default_factory=lambda: [SeasonSpec(name="default", start_day=1)]
+    )
+
+    @model_validator(mode="after")
+    def validate_seasons(self) -> CalendarSpec:
+        starts = [season.start_day for season in self.seasons]
+        if not starts or starts[0] != 1:
+            raise ValueError("calendar seasons must start at day 1")
+        if starts != sorted(set(starts)):
+            raise ValueError("calendar season start days must be unique and sorted")
+        if starts[-1] > self.days_per_year:
+            raise ValueError("calendar season start day exceeds days_per_year")
+        return self
+
+
+class WeatherOptionSpec(StrictModel):
+    condition: str
+    weight: int = Field(default=1, gt=0)
+    temperature_min_c: int = 10
+    temperature_max_c: int = 20
+    precipitation: float = Field(default=0.0, ge=0.0, le=1.0)
+    wind_min_kph: int = Field(default=0, ge=0)
+    wind_max_kph: int = Field(default=10, ge=0)
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> WeatherOptionSpec:
+        if self.temperature_min_c > self.temperature_max_c:
+            raise ValueError("weather minimum temperature exceeds maximum")
+        if self.wind_min_kph > self.wind_max_kph:
+            raise ValueError("weather minimum wind exceeds maximum")
+        return self
+
+
+class WeatherProfileSpec(StrictModel):
+    id: str
+    region_id: str
+    update_interval_minutes: int = Field(default=180, gt=0)
+    options: list[WeatherOptionSpec] = Field(min_length=1)
+
+
+class NpcScheduleEntrySpec(StrictModel):
+    start_minute: int = Field(ge=0, lt=1440)
+    location_id: str
+    activity: str = "idle"
+
+
+class NpcScheduleSpec(StrictModel):
+    id: str
+    tick_interval_minutes: int = Field(default=30, gt=0)
+    entries: list[NpcScheduleEntrySpec] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_entries(self) -> NpcScheduleSpec:
+        starts = [entry.start_minute for entry in self.entries]
+        if starts != sorted(set(starts)):
+            raise ValueError("NPC schedule entries must have unique sorted start times")
+        return self
+
+
+class FactionSpec(StrictModel):
+    id: str
+    name: str
+    base_relations: dict[str, int] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_relations(self) -> FactionSpec:
+        if any(not -100 <= value <= 100 for value in self.base_relations.values()):
+            raise ValueError("faction relations must be between -100 and 100")
+        return self
+
+
+class SettlementSpec(StrictModel):
+    id: str
+    name: str
+    location_id: str
+    faction_id: str | None = None
+    population: int = Field(default=0, ge=0)
+    treasury: int = Field(default=0, ge=0)
+    prosperity: float = Field(default=1.0, ge=0.0, le=2.0)
+    initial_stocks: dict[str, int] = Field(default_factory=dict)
+    production_per_tick: dict[str, int] = Field(default_factory=dict)
+    consumption_per_tick: dict[str, int] = Field(default_factory=dict)
+    income_per_tick: int = Field(default=0, ge=0)
+    expenses_per_tick: int = Field(default=0, ge=0)
+    tick_interval_minutes: int = Field(default=360, gt=0)
+
+    @model_validator(mode="after")
+    def validate_stock_values(self) -> SettlementSpec:
+        stock_values = [
+            *self.initial_stocks.values(),
+            *self.production_per_tick.values(),
+            *self.consumption_per_tick.values(),
+        ]
+        if any(value < 0 for value in stock_values):
+            raise ValueError("settlement stock/flow values cannot be negative")
+        return self
+
+
+class DynamicQuestTemplateSpec(StrictModel):
+    id: str
+    title: str
+    description: str
+    target_location_ids: list[str] = Field(min_length=1)
+    reward_currency: str = "gold"
+    reward_amount: int = Field(default=0, ge=0)
+    expires_after_minutes: int | None = Field(default=None, gt=0)
+
+
+class RumorTemplateSpec(StrictModel):
+    id: str
+    text: str
+    location_id: str
+    weight: int = Field(default=1, gt=0)
+    interval_minutes: int = Field(default=360, gt=0)
+    expires_after_minutes: int | None = Field(default=720, gt=0)
+    quest_template_id: str | None = None
+
+
+class ResourceNodeSpec(StrictModel):
+    id: str
+    location_id: str
+    item_id: str
+    capacity: int = Field(gt=0)
+    initial_amount: int = Field(ge=0)
+    regen_amount: int = Field(default=1, gt=0)
+    regen_interval_minutes: int = Field(default=360, gt=0)
+
+    @model_validator(mode="after")
+    def validate_initial_amount(self) -> ResourceNodeSpec:
+        if self.initial_amount > self.capacity:
+            raise ValueError("resource initial amount exceeds capacity")
+        return self
+
+
 class ContentManifest(StrictModel):
     id: str
     name: str
@@ -203,6 +349,14 @@ class ContentRegistry(StrictModel):
     dialogues: dict[str, DialogueSpec] = Field(default_factory=dict)
     quests: dict[str, QuestSpec] = Field(default_factory=dict)
     merchants: dict[str, MerchantSpec] = Field(default_factory=dict)
+    calendars: dict[str, CalendarSpec] = Field(default_factory=dict)
+    weather_profiles: dict[str, WeatherProfileSpec] = Field(default_factory=dict)
+    npc_schedules: dict[str, NpcScheduleSpec] = Field(default_factory=dict)
+    factions: dict[str, FactionSpec] = Field(default_factory=dict)
+    settlements: dict[str, SettlementSpec] = Field(default_factory=dict)
+    dynamic_quest_templates: dict[str, DynamicQuestTemplateSpec] = Field(default_factory=dict)
+    rumor_templates: dict[str, RumorTemplateSpec] = Field(default_factory=dict)
+    resource_nodes: dict[str, ResourceNodeSpec] = Field(default_factory=dict)
 
     @classmethod
     def with_core_defaults(cls) -> ContentRegistry:

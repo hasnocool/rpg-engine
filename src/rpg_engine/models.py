@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from rpg_engine.timeline import TimelineState
+
 
 class StrictModel(BaseModel):
     """Pydantic base model that rejects unknown fields in engine contracts."""
@@ -74,7 +76,7 @@ class Position(StrictModel):
 
 
 class Inventory(StrictModel):
-    """Backward-compatible inventory plus v0.3 equipment/currency state."""
+    """Backward-compatible inventory plus adventure equipment/currency state."""
 
     item_ids: list[str] = Field(default_factory=list)
     equipped_item_ids: list[str] = Field(default_factory=list)
@@ -239,12 +241,104 @@ class QuestProgress(StrictModel):
     completed: bool = False
 
 
+class CalendarState(StrictModel):
+    calendar_id: str = "default"
+    absolute_minute: int = Field(default=0, ge=0)
+    year: int = Field(default=1, ge=1)
+    day_of_year: int = Field(default=1, ge=1)
+    day: int = Field(default=1, ge=1)
+    minute_of_day: int = Field(default=0, ge=0)
+    season: str = "default"
+
+
+class WeatherState(StrictModel):
+    profile_id: str
+    region_id: str
+    condition: str
+    temperature_c: int
+    precipitation: float = Field(default=0.0, ge=0.0, le=1.0)
+    wind_kph: int = Field(default=0, ge=0)
+    updated_at_minute: int = Field(ge=0)
+
+
+class NpcScheduleState(StrictModel):
+    actor_id: str
+    schedule_id: str
+    location_id: str
+    activity: str
+    updated_at_minute: int = Field(ge=0)
+
+
+class SettlementState(StrictModel):
+    id: str
+    name: str
+    location_id: str
+    faction_id: str | None = None
+    population: int = Field(default=0, ge=0)
+    treasury: int = Field(default=0, ge=0)
+    prosperity: float = Field(default=1.0, ge=0.0, le=2.0)
+    stocks: dict[str, int] = Field(default_factory=dict)
+    price_index: dict[str, float] = Field(default_factory=dict)
+    updated_at_minute: int = Field(default=0, ge=0)
+
+
+class RumorState(StrictModel):
+    id: str
+    template_id: str
+    text: str
+    location_id: str
+    generated_at_minute: int = Field(ge=0)
+    expires_at_minute: int | None = Field(default=None, ge=0)
+    dynamic_quest_id: str | None = None
+
+
+class DynamicQuestState(StrictModel):
+    id: str
+    template_id: str
+    title: str
+    description: str
+    origin_location_id: str
+    target_location_id: str
+    generated_at_minute: int = Field(ge=0)
+    expires_at_minute: int | None = Field(default=None, ge=0)
+    status: Literal["active", "completed", "expired"] = "active"
+
+
+class ResourceNodeState(StrictModel):
+    id: str
+    location_id: str
+    item_id: str
+    amount: int = Field(ge=0)
+    capacity: int = Field(ge=0)
+    last_regen_minute: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_amount(self) -> ResourceNodeState:
+        if self.amount > self.capacity:
+            raise ValueError("resource amount cannot exceed capacity")
+        return self
+
+
+class OffscreenEncounterRecord(StrictModel):
+    id: str
+    location_id: str | None = None
+    attacker_ids: list[str]
+    defender_ids: list[str]
+    attacker_score: int
+    defender_score: int
+    winner: Literal["attackers", "defenders"]
+    health_after: dict[str, int] = Field(default_factory=dict)
+    defeated_ids: list[str] = Field(default_factory=list)
+    resolved_at_minute: int = Field(ge=0)
+
+
 class WorldState(StrictModel):
     campaign_id: str
     seed: int
     sequence: int = 0
     event_count: int = 0
     time_minutes: int = 0
+    timeline: TimelineState = Field(default_factory=TimelineState)
     rng_counters: dict[str, int] = Field(default_factory=dict)
     entities: dict[str, Entity] = Field(default_factory=dict)
     encounters: dict[str, EncounterState] = Field(default_factory=dict)
@@ -255,3 +349,14 @@ class WorldState(StrictModel):
     knowledge: dict[str, AdventureKnowledge] = Field(default_factory=dict)
     dialogue_sessions: dict[str, DialogueSession] = Field(default_factory=dict)
     quest_progress: dict[str, dict[str, QuestProgress]] = Field(default_factory=dict)
+    living_world_initialized: bool = False
+    calendar: CalendarState = Field(default_factory=CalendarState)
+    weather: dict[str, WeatherState] = Field(default_factory=dict)
+    npc_schedules: dict[str, NpcScheduleState] = Field(default_factory=dict)
+    faction_relations: dict[str, dict[str, int]] = Field(default_factory=dict)
+    reputation: dict[str, dict[str, int]] = Field(default_factory=dict)
+    settlements: dict[str, SettlementState] = Field(default_factory=dict)
+    rumors: dict[str, RumorState] = Field(default_factory=dict)
+    dynamic_quests: dict[str, DynamicQuestState] = Field(default_factory=dict)
+    resource_nodes: dict[str, ResourceNodeState] = Field(default_factory=dict)
+    offscreen_encounters: dict[str, OffscreenEncounterRecord] = Field(default_factory=dict)

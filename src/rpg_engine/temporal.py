@@ -1,8 +1,7 @@
-"""Authoritative presentation-agnostic simulation engine with living-world extensions."""
+"""Timeline-aware authoritative engine used by v0.2.1 campaign services."""
 
 from __future__ import annotations
 
-from rpg_engine.adventure import AdventureError, AdventureRuntime
 from rpg_engine.commands import (
     AdvanceTimeCommand,
     AdvanceTimelineCommand,
@@ -16,9 +15,9 @@ from rpg_engine.commands import (
     SetTimelinePausedCommand,
     StartEncounterCommand,
     SyncTimelineCommand,
-    TravelCommand,
 )
 from rpg_engine.content.models import ContentRegistry
+from rpg_engine.engine import SimulationEngine, SimulationError
 from rpg_engine.events import (
     Event,
     EventBase,
@@ -28,27 +27,23 @@ from rpg_engine.events import (
     TimelineItemFiredEvent,
     TimelineItemScheduledEvent,
     TimelinePauseChangedEvent,
-    TravelCompletedEvent,
 )
 from rpg_engine.hooks import HookRegistry
-from rpg_engine.living import LivingWorldError, LivingWorldRuntime
-from rpg_engine.living_hooks import EcologyHookRegistry
 from rpg_engine.models import WorldState
 from rpg_engine.rules.base import RulesRuntime
 from rpg_engine.spatial import SpatialAdapter
-from rpg_engine.tactical_engine import SimulationEngine as TacticalSimulationEngine
-from rpg_engine.tactical_engine import SimulationError
 from rpg_engine.timeline import (
     TimelineAdvanceResult,
     TimelineAdvanceSource,
     TimelineError,
+    TimelineItem,
     TimelineItemKind,
     TimelineScheduler,
 )
 
 
-class SimulationEngine(TacticalSimulationEngine):
-    """v0.1-v0.4 authority composed from tactical, adventure, timeline, and living domains."""
+class TimelineSimulationEngine(SimulationEngine):
+    """Simulation engine with one persisted scheduler for tactical and world time."""
 
     def __init__(
         self,
@@ -58,61 +53,34 @@ class SimulationEngine(TacticalSimulationEngine):
         content: ContentRegistry | None = None,
         spatial: SpatialAdapter | None = None,
         hooks: HookRegistry | None = None,
-        ecology_hooks: EcologyHookRegistry | None = None,
     ) -> None:
-        super().__init__(
-            world,
-            rules=rules,
-            content=content,
-            spatial=spatial,
-            hooks=hooks,
-        )
+        super().__init__(world, rules=rules, content=content, spatial=spatial, hooks=hooks)
         self.timeline = TimelineScheduler(self.world)
-        self.adventure = AdventureRuntime(
-            self.world,
-            content=self.content,
-            rules=self.rules,
-            rng=self.rng,
-        )
-        self.living = LivingWorldRuntime(
-            self.world,
-            content=self.content,
-            rng=self.rng,
-            timeline=self.timeline,
-            ecology_hooks=ecology_hooks,
-        )
 
-    def _stamp_domain(self, raw_events: list[EventBase]) -> list[Event]:
+    def _stamp_timeline(self, raw_events: list[EventBase]) -> list[Event]:
         return self._stamp(self._expand_hooks(raw_events))
 
-    def _advance_events(self, result: TimelineAdvanceResult) -> list[EventBase]:
+    @staticmethod
+    def _advance_events(result: TimelineAdvanceResult) -> list[EventBase]:
         events: list[EventBase] = [
             TimelineAdvancedEvent(
                 source=result.source,
+                previous_ms=result.previous_ms,
+                now_ms=result.now_ms,
                 delta_ms=result.delta_ms,
-                time_ms=result.now_ms,
-                wall_clock_anchor_ms=result.wall_clock_anchor_ms,
+                firings=len(result.fired),
                 backlog=result.backlog,
+                wall_clock_anchor_ms=result.wall_clock_anchor_ms,
             )
         ]
-        for firing in result.fired:
-            if self.world.living_world_initialized:
-                events.extend(self.living.calendar_events(firing.item.due_ms))
-                events.extend(
-                    self.living.expire_dynamic_quests(firing.item.due_ms // 60_000)
-                )
-            events.append(
-                TimelineItemFiredEvent(
-                    item=firing.item,
-                    fired_at_ms=firing.item.due_ms,
-                    rescheduled_item=firing.rescheduled_item,
-                )
+        events.extend(
+            TimelineItemFiredEvent(
+                item=firing.item,
+                fired_at_ms=result.now_ms,
+                rescheduled_item=firing.rescheduled_item,
             )
-            if self.world.living_world_initialized:
-                events.extend(self.living.on_timeline_item(firing.item))
-        if self.world.living_world_initialized:
-            events.extend(self.living.calendar_events(result.now_ms))
-            events.extend(self.living.expire_dynamic_quests(result.now_ms // 60_000))
+            for firing in result.fired
+        )
         return events
 
     def _schedule_turn_signals(
@@ -144,6 +112,7 @@ class SimulationEngine(TacticalSimulationEngine):
         else:
             result = self.timeline.drain_due()
         events.extend(self._advance_events(result))
+
         idle = self.timeline.schedule_idle_pressure(
             f"idle-pressure:{suffix}",
             actor_id,
@@ -178,7 +147,7 @@ class SimulationEngine(TacticalSimulationEngine):
                     turn_quantum_ms=command.turn_quantum_ms,
                     turn_timeout_ms=command.turn_timeout_ms,
                 )
-                return self._stamp_domain(
+                return self._stamp_timeline(
                     [
                         TimelineConfiguredEvent(
                             mode=state.mode,
@@ -189,6 +158,7 @@ class SimulationEngine(TacticalSimulationEngine):
                         )
                     ]
                 )
+
             if isinstance(command, ScheduleTimelineItemCommand):
                 item = self.timeline.schedule(
                     command.item_id,
@@ -202,33 +172,38 @@ class SimulationEngine(TacticalSimulationEngine):
                     remaining_occurrences=command.remaining_occurrences,
                     replace=command.replace,
                 )
-                return self._stamp_domain([TimelineItemScheduledEvent(item=item)])
+                return self._stamp_timeline([TimelineItemScheduledEvent(item=item)])
+
             if isinstance(command, CancelTimelineItemCommand):
-                item = self.timeline.cancel(command.item_id)
-                if item is None:
+                cancelled_item: TimelineItem | None = self.timeline.cancel(command.item_id)
+                if cancelled_item is None:
                     raise TimelineError(f"unknown timeline item: {command.item_id}")
-                return self._stamp_domain(
+                return self._stamp_timeline(
                     [TimelineItemCancelledEvent(item_id=command.item_id)]
                 )
+
             if isinstance(command, AdvanceTimelineCommand):
                 result = self.timeline.advance(
                     command.delta_ms,
                     source=TimelineAdvanceSource.MANUAL,
-                    max_firings=command.max_firings,
+                    max_firings=command.max_firings if command.max_firings is not None else 10_000,
                 )
-                return self._stamp_domain(self._advance_events(result))
+                return self._stamp_timeline(self._advance_events(result))
+
             if isinstance(command, AdvanceTimelineTurnCommand):
                 result = self.timeline.advance_turn(
                     turns=command.turns,
-                    max_firings=command.max_firings,
+                    max_firings=command.max_firings if command.max_firings is not None else 10_000,
                 )
-                return self._stamp_domain(self._advance_events(result))
+                return self._stamp_timeline(self._advance_events(result))
+
             if isinstance(command, SyncTimelineCommand):
                 result = self.timeline.sync_wall_clock(
                     command.wall_time_ms,
-                    max_firings=command.max_firings,
+                    max_firings=command.max_firings if command.max_firings is not None else 10_000,
                 )
-                return self._stamp_domain(self._advance_events(result))
+                return self._stamp_timeline(self._advance_events(result))
+
             if isinstance(command, SetTimelinePausedCommand):
                 raw_events: list[EventBase] = []
                 if (
@@ -241,75 +216,49 @@ class SimulationEngine(TacticalSimulationEngine):
                 if command.wall_time_ms is not None:
                     result = self.timeline.sync_wall_clock(
                         command.wall_time_ms,
-                        max_firings=command.max_firings,
+                        max_firings=10_000,
                     )
                     raw_events.extend(self._advance_events(result))
                 paused = self.timeline.set_paused(command.paused)
                 raw_events.append(TimelinePauseChangedEvent(paused=paused))
-                return self._stamp_domain(raw_events)
+                return self._stamp_timeline(raw_events)
+
             if isinstance(command, DrainTimelineCommand):
-                result = self.timeline.drain_due(max_firings=command.max_firings)
-                return self._stamp_domain(self._advance_events(result))
+                max_firings = command.max_firings if command.max_firings is not None else 10_000
+                result = self.timeline.drain_due(max_firings=max_firings)
+                return self._stamp_timeline(self._advance_events(result))
         except TimelineError as exc:
             raise SimulationError(str(exc)) from exc
         return None
 
-    def _post_tactical_timeline(self, command: Command) -> list[EventBase]:
-        raw_events: list[EventBase] = []
-        if isinstance(command, AdvanceTimeCommand):
-            raw_events.extend(
-                self._advance_events(
-                    self.timeline.advance_legacy_world_time(command.minutes)
-                )
-            )
-        elif isinstance(command, StartEncounterCommand):
-            raw_events.extend(
-                self._schedule_turn_signals(command.encounter_id, advance_turn=False)
-            )
-        elif isinstance(command, EndTurnCommand):
-            raw_events.extend(self._cancel_actor_idle_pressure(command.actor_id))
-            encounter = self._active_encounter_for_actor(command.actor_id)
-            if encounter is not None:
-                raw_events.extend(self._schedule_turn_signals(encounter.id, advance_turn=True))
-        return raw_events
-
-    def execute(self, command: Command) -> list[Event]:  # type: ignore[override]
+    def execute(self, command: Command) -> list[Event]:
         timeline_events = self._execute_timeline_command(command)
         if timeline_events is not None:
             return timeline_events
 
-        if LivingWorldRuntime.handles(command):
-            try:
-                raw_events = self.living.execute(command)
-            except LivingWorldError as exc:
-                raise SimulationError(str(exc)) from exc
-            return self._stamp_domain(raw_events)
-
-        if AdventureRuntime.handles(command):
-            try:
-                raw_events = self.adventure.execute(command)
-            except AdventureError as exc:
-                raise SimulationError(str(exc)) from exc
-            events = self._stamp_domain(raw_events)
-            if isinstance(command, TravelCommand):
-                travel = next(
-                    event for event in raw_events if isinstance(event, TravelCompletedEvent)
-                )
-                try:
-                    timeline_result = self.timeline.advance_legacy_world_time(travel.minutes)
-                except TimelineError as exc:
-                    raise SimulationError(str(exc)) from exc
-                events.extend(self._stamp_domain(self._advance_events(timeline_result)))
-            return events
-
         base_events = super().execute(command)
+        raw_events: list[EventBase] = []
         try:
-            timeline_raw = self._post_tactical_timeline(command)
+            if isinstance(command, AdvanceTimeCommand):
+                raw_events.extend(
+                    self._advance_events(
+                        self.timeline.advance_legacy_world_time(command.minutes)
+                    )
+                )
+            elif isinstance(command, StartEncounterCommand):
+                raw_events.extend(
+                    self._schedule_turn_signals(command.encounter_id, advance_turn=False)
+                )
+            elif isinstance(command, EndTurnCommand):
+                raw_events.extend(self._cancel_actor_idle_pressure(command.actor_id))
+                encounter = self._active_encounter_for_actor(command.actor_id)
+                if encounter is not None:
+                    raw_events.extend(
+                        self._schedule_turn_signals(encounter.id, advance_turn=True)
+                    )
         except TimelineError as exc:
             raise SimulationError(str(exc)) from exc
-        if not timeline_raw:
+
+        if not raw_events:
             return base_events
-        return [*base_events, *self._stamp_domain(timeline_raw)]
-
-
-__all__ = ["SimulationEngine", "SimulationError"]
+        return [*base_events, *self._stamp_timeline(raw_events)]

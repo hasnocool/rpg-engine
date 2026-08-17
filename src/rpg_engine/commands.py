@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, model_validator
 
 from rpg_engine.models import Ability, Entity, Position, StrictModel
+from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):
@@ -175,6 +176,121 @@ class SellItemCommand(StrictModel):
     quantity: int = Field(default=1, ge=1, le=1000)
 
 
+class ConfigureTimelineCommand(StrictModel):
+    type: Literal["configure_timeline"] = "configure_timeline"
+    mode: TimeMode
+    turn_quantum_ms: int | None = Field(default=None, gt=0)
+    turn_timeout_ms: int | None = Field(default=None, gt=0)
+
+
+class ScheduleTimelineItemCommand(StrictModel):
+    type: Literal["schedule_timeline_item"] = "schedule_timeline_item"
+    item_id: str
+    kind: TimelineItemKind
+    delay_ms: int | None = Field(default=None, ge=0)
+    due_ms: int | None = Field(default=None, ge=0)
+    priority: int = 0
+    actor_id: str | None = None
+    payload: TimelinePayload = Field(default_factory=dict)
+    interval_ms: int | None = Field(default=None, gt=0)
+    remaining_occurrences: int | None = Field(default=None, gt=0)
+    replace: bool = False
+
+    @model_validator(mode="after")
+    def validate_due_time(self) -> ScheduleTimelineItemCommand:
+        if self.delay_ms is not None and self.due_ms is not None:
+            raise ValueError("provide delay_ms or due_ms, not both")
+        return self
+
+
+class CancelTimelineItemCommand(StrictModel):
+    type: Literal["cancel_timeline_item"] = "cancel_timeline_item"
+    item_id: str
+
+
+class AdvanceTimelineCommand(StrictModel):
+    type: Literal["advance_timeline"] = "advance_timeline"
+    delta_ms: int = Field(gt=0)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class AdvanceTimelineTurnCommand(StrictModel):
+    type: Literal["advance_timeline_turn"] = "advance_timeline_turn"
+    turns: int = Field(default=1, gt=0, le=10_000)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class SyncTimelineCommand(StrictModel):
+    type: Literal["sync_timeline"] = "sync_timeline"
+    wall_time_ms: int = Field(ge=0)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class SetTimelinePausedCommand(StrictModel):
+    type: Literal["set_timeline_paused"] = "set_timeline_paused"
+    paused: bool
+    wall_time_ms: int | None = Field(default=None, ge=0)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class DrainTimelineCommand(StrictModel):
+    type: Literal["drain_timeline"] = "drain_timeline"
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class InitializeLivingWorldCommand(StrictModel):
+    type: Literal["initialize_living_world"] = "initialize_living_world"
+
+
+class AdjustFactionRelationCommand(StrictModel):
+    type: Literal["adjust_faction_relation"] = "adjust_faction_relation"
+    faction_a_id: str
+    faction_b_id: str
+    delta: int = Field(ge=-200, le=200)
+    reason: str = "command"
+
+
+class AdjustReputationCommand(StrictModel):
+    type: Literal["adjust_reputation"] = "adjust_reputation"
+    actor_id: str
+    faction_id: str
+    delta: int = Field(ge=-200, le=200)
+    reason: str = "command"
+
+
+class ResolveOffscreenEncounterCommand(StrictModel):
+    type: Literal["resolve_offscreen_encounter"] = "resolve_offscreen_encounter"
+    encounter_id: str
+    attacker_ids: list[str] = Field(min_length=1)
+    defender_ids: list[str] = Field(min_length=1)
+    location_id: str | None = None
+
+
+class GenerateRumorCommand(StrictModel):
+    type: Literal["generate_rumor"] = "generate_rumor"
+    location_id: str | None = None
+    template_id: str | None = None
+
+
+class GenerateDynamicQuestCommand(StrictModel):
+    type: Literal["generate_dynamic_quest"] = "generate_dynamic_quest"
+    origin_location_id: str
+    template_id: str | None = None
+
+
+class CompleteDynamicQuestCommand(StrictModel):
+    type: Literal["complete_dynamic_quest"] = "complete_dynamic_quest"
+    actor_id: str
+    quest_id: str
+
+
+class HarvestResourceCommand(StrictModel):
+    type: Literal["harvest_resource"] = "harvest_resource"
+    actor_id: str
+    node_id: str
+    amount: int = Field(default=1, gt=0, le=1000)
+
+
 Command = Annotated[
     CreateEntityCommand
     | SpawnNpcCommand
@@ -200,11 +316,27 @@ Command = Annotated[
     | StartQuestCommand
     | AdvanceQuestCommand
     | BuyItemCommand
-    | SellItemCommand,
+    | SellItemCommand
+    | ConfigureTimelineCommand
+    | ScheduleTimelineItemCommand
+    | CancelTimelineItemCommand
+    | AdvanceTimelineCommand
+    | AdvanceTimelineTurnCommand
+    | SyncTimelineCommand
+    | SetTimelinePausedCommand
+    | DrainTimelineCommand
+    | InitializeLivingWorldCommand
+    | AdjustFactionRelationCommand
+    | AdjustReputationCommand
+    | ResolveOffscreenEncounterCommand
+    | GenerateRumorCommand
+    | GenerateDynamicQuestCommand
+    | CompleteDynamicQuestCommand
+    | HarvestResourceCommand,
     Field(discriminator="type"),
 ]
 
-COMMAND_ADAPTER = TypeAdapter(Command)
+COMMAND_ADAPTER: TypeAdapter[Command] = TypeAdapter(Command)
 
 
 def parse_command(payload: object) -> Command:

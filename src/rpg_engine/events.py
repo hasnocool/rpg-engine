@@ -10,16 +10,25 @@ from rpg_engine.models import (
     Ability,
     ActionBudget,
     ActiveEffect,
+    CalendarState,
     ContainerState,
     DialogueSession,
+    DynamicQuestState,
     EncounterState,
     Entity,
+    NpcScheduleState,
+    OffscreenEncounterRecord,
     Position,
     QuestProgress,
     ReactionOffer,
+    ResourceNodeState,
+    RumorState,
+    SettlementState,
     StrictModel,
+    WeatherState,
 )
 from rpg_engine.resolution import Modifier
+from rpg_engine.timeline import TimelineAdvanceSource, TimelineItem, TimeMode
 
 
 class EventBase(StrictModel):
@@ -372,6 +381,143 @@ class TransactionCompletedEvent(EventBase):
     seller_balance_after: int
 
 
+class TimelineConfiguredEvent(EventBase):
+    type: Literal["timeline_configured"] = "timeline_configured"
+    mode: TimeMode
+    turn_quantum_ms: int
+    turn_timeout_ms: int
+    paused: bool
+    wall_clock_anchor_ms: int | None = None
+
+
+class TimelineItemScheduledEvent(EventBase):
+    type: Literal["timeline_item_scheduled"] = "timeline_item_scheduled"
+    item: TimelineItem
+
+
+class TimelineItemCancelledEvent(EventBase):
+    type: Literal["timeline_item_cancelled"] = "timeline_item_cancelled"
+    item_id: str
+
+
+class TimelineAdvancedEvent(EventBase):
+    type: Literal["timeline_advanced"] = "timeline_advanced"
+    source: TimelineAdvanceSource
+    delta_ms: int
+    time_ms: int
+    wall_clock_anchor_ms: int | None = None
+    backlog: bool = False
+
+
+class TimelineItemFiredEvent(EventBase):
+    type: Literal["timeline_item_fired"] = "timeline_item_fired"
+    item: TimelineItem
+    fired_at_ms: int
+    rescheduled_item: TimelineItem | None = None
+
+
+class TimelinePauseChangedEvent(EventBase):
+    type: Literal["timeline_pause_changed"] = "timeline_pause_changed"
+    paused: bool
+
+
+class LivingWorldInitializedEvent(EventBase):
+    type: Literal["living_world_initialized"] = "living_world_initialized"
+    initialized_at_ms: int
+
+
+class CalendarAdvancedEvent(EventBase):
+    type: Literal["calendar_advanced"] = "calendar_advanced"
+    calendar: CalendarState
+
+
+class WeatherChangedEvent(EventBase):
+    type: Literal["weather_changed"] = "weather_changed"
+    weather: WeatherState
+
+
+class NpcScheduleAppliedEvent(EventBase):
+    type: Literal["npc_schedule_applied"] = "npc_schedule_applied"
+    schedule: NpcScheduleState
+    position: Position
+
+
+class FactionRelationChangedEvent(EventBase):
+    type: Literal["faction_relation_changed"] = "faction_relation_changed"
+    faction_a_id: str
+    faction_b_id: str
+    previous: int
+    current: int
+    reason: str
+
+
+class ReputationChangedEvent(EventBase):
+    type: Literal["reputation_changed"] = "reputation_changed"
+    actor_id: str
+    faction_id: str
+    previous: int
+    current: int
+    reason: str
+
+
+class SettlementInitializedEvent(EventBase):
+    type: Literal["settlement_initialized"] = "settlement_initialized"
+    settlement: SettlementState
+
+
+class SettlementEconomyTickedEvent(EventBase):
+    type: Literal["settlement_economy_ticked"] = "settlement_economy_ticked"
+    settlement: SettlementState
+
+
+class OffscreenEncounterResolvedEvent(EventBase):
+    type: Literal["offscreen_encounter_resolved"] = "offscreen_encounter_resolved"
+    record: OffscreenEncounterRecord
+
+
+class RumorGeneratedEvent(EventBase):
+    type: Literal["rumor_generated"] = "rumor_generated"
+    rumor: RumorState
+
+
+class DynamicQuestGeneratedEvent(EventBase):
+    type: Literal["dynamic_quest_generated"] = "dynamic_quest_generated"
+    quest: DynamicQuestState
+
+
+class DynamicQuestUpdatedEvent(EventBase):
+    type: Literal["dynamic_quest_updated"] = "dynamic_quest_updated"
+    quest: DynamicQuestState
+    actor_id: str | None = None
+    reward_currency: str | None = None
+    reward_amount: int = 0
+    actor_balance_after: int | None = None
+
+
+class ResourceNodeInitializedEvent(EventBase):
+    type: Literal["resource_node_initialized"] = "resource_node_initialized"
+    node: ResourceNodeState
+
+
+class ResourceHarvestedEvent(EventBase):
+    type: Literal["resource_harvested"] = "resource_harvested"
+    actor_id: str
+    node_id: str
+    item_id: str
+    amount: int
+    node_amount_after: int
+    actor_item_ids_after: list[str]
+
+
+class ResourceRegeneratedEvent(EventBase):
+    type: Literal["resource_regenerated"] = "resource_regenerated"
+    node_id: str
+    amount: int
+    amount_after: int
+    last_regen_minute: int
+    weather_condition: str | None = None
+
+
 Event = Annotated[
     EntityCreatedEvent
     | NpcSpawnedEvent
@@ -415,11 +561,32 @@ Event = Annotated[
     | AreaTargetsResolvedEvent
     | TriggerRaisedEvent
     | ReactionOfferedEvent
-    | ReactionUsedEvent,
+    | ReactionUsedEvent
+    | TimelineConfiguredEvent
+    | TimelineItemScheduledEvent
+    | TimelineItemCancelledEvent
+    | TimelineAdvancedEvent
+    | TimelineItemFiredEvent
+    | TimelinePauseChangedEvent
+    | LivingWorldInitializedEvent
+    | CalendarAdvancedEvent
+    | WeatherChangedEvent
+    | NpcScheduleAppliedEvent
+    | FactionRelationChangedEvent
+    | ReputationChangedEvent
+    | SettlementInitializedEvent
+    | SettlementEconomyTickedEvent
+    | OffscreenEncounterResolvedEvent
+    | RumorGeneratedEvent
+    | DynamicQuestGeneratedEvent
+    | DynamicQuestUpdatedEvent
+    | ResourceNodeInitializedEvent
+    | ResourceHarvestedEvent
+    | ResourceRegeneratedEvent,
     Field(discriminator="type"),
 ]
 
-EVENT_ADAPTER = TypeAdapter(Event)
+EVENT_ADAPTER: TypeAdapter[Event] = TypeAdapter(Event)
 
 
 def parse_event(payload: object) -> Event:

@@ -1,0 +1,15 @@
+id: blacksmith_daily
+tick_interval_minutes: 30
+entries:
+  - start_minute: 0
+    location_id: village
+    activity: sleeping
+  - start_minute: 420
+    location_id: village
+    activity: working
+  - start_minute: 1080
+    location_id: forest
+    activity: gathering_charcoal
+  - start_minute: 1260
+    location_id: village
+    activity: resting

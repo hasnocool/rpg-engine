@@ -19,3 +19,4 @@ entity:
   position: {}
 dialogue_id: torvald_intro
 merchant_id: blacksmith
+schedule_id: blacksmith_daily

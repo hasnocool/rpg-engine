@@ -1,0 +1,25 @@
+id: north_vale
+region_id: north_vale
+update_interval_minutes: 180
+options:
+  - condition: clear
+    weight: 5
+    temperature_min_c: 8
+    temperature_max_c: 18
+    precipitation: 0.0
+    wind_min_kph: 0
+    wind_max_kph: 12
+  - condition: rain
+    weight: 3
+    temperature_min_c: 5
+    temperature_max_c: 14
+    precipitation: 0.75
+    wind_min_kph: 4
+    wind_max_kph: 24
+  - condition: storm
+    weight: 1
+    temperature_min_c: 3
+    temperature_max_c: 11
+    precipitation: 1.0
+    wind_min_kph: 20
+    wind_max_kph: 55

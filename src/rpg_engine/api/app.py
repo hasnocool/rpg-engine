@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -27,6 +28,11 @@ from rpg_engine.observations import CampaignObservation
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
 from rpg_engine.webclient import INDEX_HTML
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+_app_state_service: CampaignService | None = None
 
 
 def _event_envelope(campaign_id: str, events: list[Event], *, cursor: int) -> EventEnvelope:
@@ -63,7 +69,9 @@ def create_app(
         content = None
         if content_path is not None:
             content = await load_content_pack_async(Path(content_path))
-        app.state.service = CampaignService(store, content=content)
+        global _app_state_service
+        _app_state_service = CampaignService(store, content=content)
+        app.state.service = _app_state_service
         yield
 
     app = FastAPI(
@@ -75,7 +83,8 @@ def create_app(
     v1 = APIRouter(prefix="/api/v1")
 
     def service() -> CampaignService:
-        return app.state.service
+        assert _app_state_service is not None
+        return _app_state_service
 
     async def state_for(campaign_id: str) -> WorldState:
         try:
