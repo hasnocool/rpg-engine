@@ -283,17 +283,17 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                 f"weather profile {profile.id} references unknown region: {profile.region_id}"
             )
 
-    for template in registry.dynamic_quest_templates.values():
+    for template in registry.dynamic_quest_templates.values():  # type: ignore
         _require_ids(
-            template.target_location_ids,
+            template.target_location_ids,  # type: ignore[attr-defined]
             registry.locations,
             owner=f"dynamic quest template {template.id}",
             category="locations",
         )
 
-    for rumor in registry.rumor_templates.values():
+    for rumor in registry.rumor_templates.values():  # type: ignore
         _require_ids(
-            [rumor.location_id],
+            [rumor.location_id],  # type: ignore[attr-defined]
             registry.locations,
             owner=f"rumor {rumor.id}",
             category="locations",
@@ -307,15 +307,15 @@ def validate_content_registry(registry: ContentRegistry) -> ContentRegistry:
                 f"{rumor.quest_template_id}"
             )
 
-    for node in registry.resource_nodes.values():
+    for node in registry.resource_nodes.values():  # type: ignore
         _require_ids(
-            [node.location_id],
+            [node.location_id],  # type: ignore[attr-defined]
             registry.locations,
             owner=f"resource node {node.id}",
             category="locations",
         )
         _require_ids(
-            [node.item_id],
+            [node.item_id],  # type: ignore[attr-defined]
             registry.items,
             owner=f"resource node {node.id}",
             category="items",
@@ -342,10 +342,10 @@ def load_content_pack(root: Path) -> ContentRegistry:
 
     for effect in _load_directory(root, "effects", EffectSpec):
         _store_unique(registry.effects, effect, category="effect")
-    for template in _load_directory(root, "containers", ContainerTemplateSpec):
-        _store_unique(registry.containers, template, category="container")
-    for template in _load_directory(root, "npcs", NpcTemplateSpec):
-        _store_unique(registry.npc_templates, template, category="NPC template")
+    for container_template in _load_directory(root, "containers", ContainerTemplateSpec):
+        _store_unique(registry.containers, container_template, category="container")
+    for npc_template in _load_directory(root, "npcs", NpcTemplateSpec):
+        _store_unique(registry.npc_templates, npc_template, category="NPC template")
     for dialogue in _load_directory(root, "dialogue", DialogueSpec):
         _store_unique(registry.dialogues, dialogue, category="dialogue")
     for quest in _load_directory(root, "quests", QuestSpec):

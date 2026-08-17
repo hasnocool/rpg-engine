@@ -8,13 +8,13 @@ from collections import defaultdict
 
 from rpg_engine.commands import Command
 from rpg_engine.content.models import ContentRegistry
-from rpg_engine.engine import SimulationEngine
 from rpg_engine.events import Event
 from rpg_engine.models import WorldState
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.reducer import apply_event
 from rpg_engine.rules.base import RulesRuntime
 from rpg_engine.rules.d20 import D20RulesRuntime
+from rpg_engine.temporal import TimelineSimulationEngine
 
 
 class CampaignService:
@@ -32,7 +32,7 @@ class CampaignService:
         self.content = content or ContentRegistry.with_core_defaults()
         self.rules = rules or D20RulesRuntime()
         self.snapshot_interval = max(1, snapshot_interval)
-        self._engines: dict[str, SimulationEngine] = {}
+        self._engines: dict[str, TimelineSimulationEngine] = {}
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def create_campaign(self, seed: int, *, campaign_id: str | None = None) -> WorldState:
@@ -40,12 +40,12 @@ class CampaignService:
         world = WorldState(campaign_id=campaign_id, seed=seed)
         await self.store.create_campaign(campaign_id, seed)
         await self.store.save_snapshot(world)
-        self._engines[campaign_id] = SimulationEngine(
+        self._engines[campaign_id] = TimelineSimulationEngine(
             world, rules=self.rules, content=self.content
         )
         return world.model_copy(deep=True)
 
-    async def _load_engine(self, campaign_id: str) -> SimulationEngine:
+    async def _load_engine(self, campaign_id: str) -> TimelineSimulationEngine:
         cached = self._engines.get(campaign_id)
         if cached is not None:
             return cached
@@ -57,14 +57,14 @@ class CampaignService:
         events = await self.store.list_events(campaign_id, after_sequence=snapshot.sequence)
         for event in events:
             apply_event(snapshot, event)
-        engine = SimulationEngine(snapshot, rules=self.rules, content=self.content)
+        engine = TimelineSimulationEngine(snapshot, rules=self.rules, content=self.content)
         self._engines[campaign_id] = engine
         return engine
 
     async def execute(self, campaign_id: str, command: Command) -> list[Event]:
         async with self._locks[campaign_id]:
             engine = await self._load_engine(campaign_id)
-            events = engine.execute(command)
+            events: list[Event] = engine.execute(command)
             await self.store.append_events(campaign_id, events)
             if engine.world.sequence % self.snapshot_interval < len(events):
                 await self.store.save_snapshot(engine.world)

@@ -148,6 +148,28 @@ def apply_event(world: WorldState, event: Event) -> None:
         encounter.round = event.round
         encounter.turn_index = event.turn_index
         encounter.budgets[event.actor_id] = event.budget.model_copy(deep=True)
+    elif isinstance(event, TimelineConfiguredEvent):
+        world.timeline.mode = event.mode
+        world.timeline.turn_quantum_ms = event.turn_quantum_ms
+        world.timeline.turn_timeout_ms = event.turn_timeout_ms
+        world.timeline.paused = event.paused
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+    elif isinstance(event, TimelineAdvancedEvent):
+        world.timeline.now_ms = event.now_ms
+        world.time_minutes = event.now_ms // 60_000
+        world.timeline.wall_clock_anchor_ms = event.wall_clock_anchor_ms
+    elif isinstance(event, TimelineItemScheduledEvent):
+        world.timeline.queue[event.item.id] = event.item.model_copy(deep=True)
+        world.timeline.next_order = max(world.timeline.next_order, event.item.order + 1)
+    elif isinstance(event, TimelineItemFiredEvent):
+        world.timeline.queue.pop(event.item.id, None)
+        if event.rescheduled_item is not None:
+            item = event.rescheduled_item.model_copy(deep=True)
+            world.timeline.queue[item.id] = item
+    elif isinstance(event, TimelineItemCancelledEvent):
+        world.timeline.queue.pop(event.item_id, None)
+    elif isinstance(event, TimelinePauseChangedEvent):
+        world.timeline.paused = event.paused
     elif isinstance(event, ActionBudgetSpentEvent):
         budget = world.encounters[event.encounter_id].budgets[event.actor_id]
         setattr(budget, event.budget_kind, event.remaining)
