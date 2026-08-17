@@ -1,6 +1,7 @@
 # Roadmap
 
 The project is intentionally staged so simulation depth is built before expensive presentation work.
+Some presentation milestones can be implemented independently; their status is called out explicitly.
 
 ## v0.1 — Core Simulation (implemented)
 
@@ -67,16 +68,24 @@ The project is intentionally staged so simulation depth is built before expensiv
 - authenticated AsyncSSH terminal transport
 - shared `serve-all` API + SSH authority process
 
-v0.5 is intentionally implementable without v0.4 because it is a presentation/transport layer over
-existing campaign state. The next simulation-depth milestone remains v0.4.
+v0.5 is presentation/transport work over existing campaign state and does not imply v0.4 is complete.
 
-## v0.6 — Visual Adapters
+## v0.6 — Visual Adapters (implemented out of sequence)
 
-- Godot 2D adapter
-- Godot 3D adapter
-- asset/scene binding manifests
-- movement interpolation events
-- animation/VFX/audio binding hints that remain non-authoritative
+- renderer-neutral `VisualSnapshot` contract derived from viewer-scoped observations
+- data-driven asset/scene/event binding manifests
+- resumable presentation-hint REST/WebSocket stream derived from persisted events
+- movement interpolation hints
+- animation/VFX/audio hints that remain non-authoritative
+- Godot 4.7 2D reference adapter
+- Godot 4.7 3D reference adapter
+- scene/actor asset binding support
+- SSH/terminal ASCII visual adapter using the same `VisualSnapshot`
+- `map` / `visual` terminal commands
+- shared visual bindings for API, Godot, local terminal, and SSH
+
+v0.6 is also presentation work and can sit on top of v0.5 without the future living-world systems.
+The next unimplemented simulation-depth milestone remains v0.4.
 
 ## v0.7 — AI Game Master
 

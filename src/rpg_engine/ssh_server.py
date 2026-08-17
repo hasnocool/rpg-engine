@@ -12,6 +12,7 @@ from rpg_engine.content.loader import load_content_pack_async
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
 from rpg_engine.terminal import TerminalSession
+from rpg_engine.visuals import load_visual_bindings_async
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,7 @@ class SSHServerConfig:
     authorized_keys: Path = Path("authorized_keys")
     database_path: Path = Path("rpg_engine.db")
     content_path: Path | None = Path("content/core")
+    visual_bindings_path: Path | None = None
     campaign_id: str | None = None
     actor_from_username: bool = False
 
@@ -106,5 +108,12 @@ async def create_ssh_server(config: SSHServerConfig) -> asyncssh.SSHAcceptor:
     content = None
     if config.content_path is not None:
         content = await load_content_pack_async(config.content_path)
-    service = CampaignService(store, content=content)
+    visual_bindings = None
+    if config.visual_bindings_path is not None:
+        visual_bindings = await load_visual_bindings_async(config.visual_bindings_path)
+    service = CampaignService(
+        store,
+        content=content,
+        visual_bindings=visual_bindings,
+    )
     return await create_ssh_listener(service, config)

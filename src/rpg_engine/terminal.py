@@ -6,14 +6,18 @@ import json
 import shlex
 from dataclasses import dataclass
 
+from rpg_engine import __version__
 from rpg_engine.clients.base import CampaignClient
 from rpg_engine.commands import Command, parse_command
 from rpg_engine.events import Event
 from rpg_engine.observations import CampaignObservation
+from rpg_engine.terminal_visual import render_visual_snapshot
 
 _HELP = """Commands:
   help                         show this help
   observe [actor_id]           renderer-neutral campaign view
+  map [actor_id]               ASCII visual snapshot (also works over SSH)
+  visual [actor_id]            alias for map
   state                        raw authoritative state summary
   events [after_sequence]      events after a sequence cursor
   json { ... }                 execute any command payload
@@ -167,7 +171,12 @@ class TerminalSession:
     async def banner(self) -> str:
         observation = await self.client.observation(actor_id=self.actor_id)
         self.event_cursor = observation.sequence
-        return "RPG Engine terminal v0.5\n\n" + render_observation(observation) + "\n\n" + _HELP
+        return (
+            f"RPG Engine terminal v{__version__}\n\n"
+            + render_observation(observation)
+            + "\n\n"
+            + _HELP
+        )
 
     async def handle(self, line: str) -> TerminalReply:
         stripped = line.strip()
@@ -184,6 +193,11 @@ class TerminalSession:
             observation = await self.client.observation(actor_id=actor_id)
             self.event_cursor = max(self.event_cursor, observation.sequence)
             return TerminalReply(render_observation(observation))
+        if control in {"map", "visual"}:
+            actor_id = parts[1] if len(parts) > 1 else self.actor_id
+            visual = await self.client.visual(actor_id=actor_id)
+            self.event_cursor = max(self.event_cursor, visual.sequence)
+            return TerminalReply(render_visual_snapshot(visual))
         if control == "state":
             state = await self.client.state()
             return TerminalReply(

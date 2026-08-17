@@ -1,4 +1,4 @@
-"""Versioned FastAPI + resumable WebSocket transport for remote clients."""
+"""Versioned FastAPI transport with renderer-neutral visual adapter endpoints."""
 
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ from rpg_engine.api.contracts import (
     CampaignCreateRequest,
     EventEnvelope,
     ObservationEnvelope,
+    PresentationEnvelope,
     StateEnvelope,
+    VisualEnvelope,
 )
 from rpg_engine.commands import Command, parse_command
 from rpg_engine.content.loader import load_content_pack_async
@@ -26,6 +28,13 @@ from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation
 from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
+from rpg_engine.visuals import (
+    PresentationBatch,
+    VisualBindingManifest,
+    VisualSnapshot,
+    load_visual_bindings_async,
+    presentation_hints_for_event,
+)
 from rpg_engine.webclient import INDEX_HTML
 
 
@@ -45,10 +54,49 @@ def _event_envelope(campaign_id: str, events: list[Event], *, cursor: int) -> Ev
     )
 
 
+def _presentation_envelope(
+    campaign_id: str,
+    events: list[Event],
+    *,
+    cursor: int,
+    bindings: VisualBindingManifest,
+) -> PresentationEnvelope:
+    batches = [presentation_hints_for_event(event, bindings) for event in events]
+    if events:
+        return PresentationEnvelope(
+            campaign_id=campaign_id,
+            from_sequence=events[0].sequence,
+            to_sequence=events[-1].sequence,
+            batches=batches,
+        )
+    return PresentationEnvelope(
+        campaign_id=campaign_id,
+        from_sequence=cursor,
+        to_sequence=cursor,
+        heartbeat=True,
+    )
+
+
+async def _optional_visual_bindings(
+    content_path: Path | str | None,
+    visual_bindings_path: Path | str | None,
+) -> VisualBindingManifest | None:
+    if visual_bindings_path is not None:
+        return await load_visual_bindings_async(Path(visual_bindings_path))
+    if content_path is None:
+        return None
+    candidate = Path(content_path) / "visuals.yaml"
+    try:
+        return await load_visual_bindings_async(candidate)
+    except FileNotFoundError:
+        return None
+
+
 def create_app(
     *,
     database_path: Path | str = "rpg_engine.db",
     content_path: Path | str | None = None,
+    visual_bindings_path: Path | str | None = None,
     campaign_service: CampaignService | None = None,
 ) -> FastAPI:
     store = SQLiteEventStore(database_path)
@@ -63,7 +111,12 @@ def create_app(
         content = None
         if content_path is not None:
             content = await load_content_pack_async(Path(content_path))
-        app.state.service = CampaignService(store, content=content)
+        visual_bindings = await _optional_visual_bindings(content_path, visual_bindings_path)
+        app.state.service = CampaignService(
+            store,
+            content=content,
+            visual_bindings=visual_bindings,
+        )
         yield
 
     app = FastAPI(
@@ -91,9 +144,21 @@ def create_app(
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    async def visual_for(campaign_id: str, actor_id: str | None) -> VisualSnapshot:
+        try:
+            return await service().visual(campaign_id, actor_id=actor_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     async def events_for(campaign_id: str, after: int) -> list[Event]:
         try:
             return await service().events(campaign_id, after_sequence=after)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="campaign not found") from exc
+
+    async def presentation_for(campaign_id: str, after: int) -> list[PresentationBatch]:
+        try:
+            return await service().presentation(campaign_id, after_sequence=after)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="campaign not found") from exc
 
@@ -141,6 +206,17 @@ def create_app(
         )
 
     @v1.get(
+        "/campaigns/{campaign_id}/visual",
+        response_model=VisualEnvelope,
+        operation_id="v1_campaign_visual",
+    )
+    async def v1_campaign_visual(
+        campaign_id: str,
+        actor_id: str | None = Query(default=None),
+    ) -> VisualEnvelope:
+        return VisualEnvelope(visual=await visual_for(campaign_id, actor_id))
+
+    @v1.get(
         "/campaigns/{campaign_id}/events",
         response_model=EventEnvelope,
         operation_id="v1_campaign_events",
@@ -151,6 +227,30 @@ def create_app(
     ) -> EventEnvelope:
         events = await events_for(campaign_id, after)
         return _event_envelope(campaign_id, events, cursor=after)
+
+    @v1.get(
+        "/campaigns/{campaign_id}/presentation",
+        response_model=PresentationEnvelope,
+        operation_id="v1_campaign_presentation",
+    )
+    async def v1_campaign_presentation(
+        campaign_id: str,
+        after: int = Query(default=0, ge=0),
+    ) -> PresentationEnvelope:
+        batches = await presentation_for(campaign_id, after)
+        if batches:
+            return PresentationEnvelope(
+                campaign_id=campaign_id,
+                from_sequence=batches[0].event_sequence,
+                to_sequence=batches[-1].event_sequence,
+                batches=batches,
+            )
+        return PresentationEnvelope(
+            campaign_id=campaign_id,
+            from_sequence=after,
+            to_sequence=after,
+            heartbeat=True,
+        )
 
     @v1.post(
         "/campaigns/{campaign_id}/commands",
@@ -231,6 +331,37 @@ def create_app(
         after: int = Query(default=0, ge=0),
     ) -> None:
         await websocket_session(websocket, campaign_id, after)
+
+    @v1.websocket("/campaigns/{campaign_id}/presentation/ws")
+    async def v1_presentation_socket(
+        websocket: WebSocket,
+        campaign_id: str,
+        after: int = Query(default=0, ge=0),
+    ) -> None:
+        await websocket.accept()
+        try:
+            await service().state(campaign_id)
+        except KeyError:
+            await websocket.send_json({"error": "campaign not found"})
+            await websocket.close(code=4404)
+            return
+        cursor = after
+        try:
+            async for events in service().stream_events(
+                campaign_id,
+                after_sequence=after,
+            ):
+                if events:
+                    cursor = events[-1].sequence
+                envelope = _presentation_envelope(
+                    campaign_id,
+                    events,
+                    cursor=cursor,
+                    bindings=service().visual_bindings,
+                )
+                await websocket.send_json(envelope.model_dump(mode="json"))
+        except WebSocketDisconnect:
+            return
 
     app.include_router(v1)
 

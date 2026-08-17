@@ -7,8 +7,9 @@ from collections.abc import AsyncIterator
 from rpg_engine.commands import Command
 from rpg_engine.events import Event
 from rpg_engine.models import WorldState
-from rpg_engine.observations import CampaignObservation, build_observation
+from rpg_engine.observations import CampaignObservation
 from rpg_engine.service import CampaignService
+from rpg_engine.visuals import VisualSnapshot
 
 
 class LocalCampaignClient:
@@ -20,8 +21,10 @@ class LocalCampaignClient:
         return await self.service.state(self.campaign_id)
 
     async def observation(self, *, actor_id: str | None = None) -> CampaignObservation:
-        world = await self.service.state(self.campaign_id)
-        return build_observation(world, self.service.content, viewer_id=actor_id)
+        return await self.service.observation(self.campaign_id, actor_id=actor_id)
+
+    async def visual(self, *, actor_id: str | None = None) -> VisualSnapshot:
+        return await self.service.visual(self.campaign_id, actor_id=actor_id)
 
     async def events(self, *, after_sequence: int = 0) -> list[Event]:
         return await self.service.events(self.campaign_id, after_sequence=after_sequence)

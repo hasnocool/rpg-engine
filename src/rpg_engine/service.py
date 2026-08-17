@@ -17,6 +17,13 @@ from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.reducer import apply_event
 from rpg_engine.rules.base import RulesRuntime
 from rpg_engine.rules.d20 import D20RulesRuntime
+from rpg_engine.visuals import (
+    PresentationBatch,
+    VisualBindingManifest,
+    VisualSnapshot,
+    build_visual_snapshot,
+    presentation_hints_for_event,
+)
 
 
 class CampaignService:
@@ -28,11 +35,13 @@ class CampaignService:
         *,
         content: ContentRegistry | None = None,
         rules: RulesRuntime | None = None,
+        visual_bindings: VisualBindingManifest | None = None,
         snapshot_interval: int = 100,
     ) -> None:
         self.store = store
         self.content = content or ContentRegistry.with_core_defaults()
         self.rules = rules or D20RulesRuntime()
+        self.visual_bindings = visual_bindings or VisualBindingManifest()
         self.snapshot_interval = max(1, snapshot_interval)
         self._engines: dict[str, SimulationEngine] = {}
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -94,9 +103,25 @@ class CampaignService:
             engine = await self._load_engine(campaign_id)
             return build_observation(engine.world, self.content, viewer_id=actor_id)
 
+    async def visual(self, campaign_id: str, *, actor_id: str | None = None) -> VisualSnapshot:
+        async with self._locks[campaign_id]:
+            engine = await self._load_engine(campaign_id)
+            return build_visual_snapshot(
+                engine.world,
+                self.content,
+                viewer_id=actor_id,
+                bindings=self.visual_bindings,
+            )
+
     async def events(self, campaign_id: str, *, after_sequence: int = 0) -> list[Event]:
         await self.store.get_seed(campaign_id)
         return await self.store.list_events(campaign_id, after_sequence=after_sequence)
+
+    async def presentation(
+        self, campaign_id: str, *, after_sequence: int = 0
+    ) -> list[PresentationBatch]:
+        events = await self.events(campaign_id, after_sequence=after_sequence)
+        return [presentation_hints_for_event(event, self.visual_bindings) for event in events]
 
     async def stream_events(
         self,

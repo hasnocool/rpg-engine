@@ -2,74 +2,68 @@
 
 A **headless, deterministic, event-driven RPG simulation engine** for Python 3.12+.
 
-The authoritative simulation is presentation-agnostic. CLI, TUI, browser, SSH terminal, web API,
-2D, 3D, AI, and multiplayer clients issue the same commands and consume the same immutable events.
+The authoritative simulation is presentation-agnostic. CLI, TUI, browser, SSH terminal, Godot 2D,
+Godot 3D, web API, AI, and future multiplayer clients issue the same commands and consume the same
+immutable events.
 
 > The built-in `d20` runtime and `content/core` pack are original generic examples. This repository
 > does not bundle proprietary tabletop rulebooks or copyrighted campaign content. Licensed,
 > SRD-compatible, original, or homebrew rules/content belong in separate plugins and packs.
 
-## Current milestone: v0.5 Multiple Frontends
+## Current milestone: v0.6 Visual Adapters
 
-v0.5 is implemented on top of the v0.3 Adventure Engine while v0.4 Living World remains a planned
-simulation-depth milestone. The frontend milestone is intentionally independent of the future living
-world systems.
+v0.6 is implemented on top of v0.5 while **v0.4 Living World remains planned**. Like v0.5, this is a
+presentation-layer milestone which can be built without claiming future world-simulation features.
 
-v0.5 adds:
+v0.6 adds:
 
-- interactive asynchronous CLI
-- Textual TUI adapter
-- browser reference client
-- stable versioned `/api/v1` REST/OpenAPI contract
-- resumable WebSocket event subscriptions using persisted event cursors
-- renderer-neutral observation/query API
-- authenticated AsyncSSH terminal transport
-- shared `serve-all` mode for API + SSH on one authority service
-- compatibility aliases for the original unversioned API
+- renderer-neutral `VisualSnapshot` models derived from viewer-scoped observations
+- asset/scene/event binding manifests
+- movement interpolation hints
+- animation/VFX/audio binding hints which remain non-authoritative
+- resumable presentation-hint REST/WebSocket feeds derived from persisted events
+- Godot 4.7 2D reference adapter
+- Godot 4.7 3D reference adapter
+- SSH/terminal ASCII visual rendering from the same visual snapshot
+- `map` and `visual` terminal commands
+- optional shared visual bindings across API, Godot, local terminal, and SSH
 
-The core engine still knows nothing about pixels, terminal colors, browser layout, SSH, or input
-devices. Those concerns live entirely in adapters.
+The core engine still knows nothing about pixels, meshes, cameras, terminal colors, Godot scenes,
+SSH, or input devices. Those concerns live entirely in adapters.
 
 ## Architecture
 
 ```text
-                       GAME CLIENTS / TRANSPORTS
+                   AUTHORITATIVE SIMULATION
 
-     CLI          TUI          Browser          SSH terminal
-      |            |              |                  |
-      +------------+------ REST / WebSocket --------+
-                             or local client
-                                   |
-                                   v
-+----------------------------------------------------------------+
-| CampaignService                                                |
-| async per-campaign authority + resumable persisted event feed   |
-| +------------------------------------------------------------+ |
-| | SimulationEngine                                           | |
-| | + Tactical systems                                         | |
-| | + AdventureRuntime                                         | |
-| | + Rules / Hooks / deterministic RNG                        | |
-| +----------------------------+-------------------------------+ |
-+------------------------------|---------------------------------+
-                               | Events
-                               v
-                       SQLite event log
+                       CampaignService
+                             |
+                     SimulationEngine
+                  +----------+----------+
+                  |                     |
+              Tactical              Adventure
+                  |                     |
+                  +----------+----------+
+                             |
+                       immutable events
+                             |
+                         SQLite log
+                             |
+          +------------------+------------------+
+          |                                     |
+  CampaignObservation                      event cursor
+          |                                     |
+          v                                     v
+    VisualSnapshot                     PresentationBatch
+          |                            movement/animation/
+          |                               VFX/audio hints
+   +------+------+----------------+-------------+
+   |             |                |             |
+Godot 2D      Godot 3D       Terminal/SSH    future UI
 ```
 
-The world itself is content-driven:
-
-```text
-Location ---- Connection ---- Location
-   |                           |
-Discovery                    NPC template
-   |                           |
-Container                 Dialogue / Merchant
-                               |
-                              Quest
-```
-
-Renderers can attach coordinates, scenes, sprites, meshes, or maps without changing the logical
-world graph.
+`VisualSnapshot` and presentation hints are derived views. They are not authoritative state and do
+not participate in deterministic replay decisions.
 
 ## Install
 
@@ -79,70 +73,23 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-## Run
-
-Deterministic demo:
+## Run the API / visual service
 
 ```bash
-rpg-engine demo --seed 918392482
-```
-
-REST/WebSocket/browser server:
-
-```bash
-rpg-engine serve --host 127.0.0.1 --port 8000
-```
-
-Interactive terminal client:
-
-```bash
-rpg-engine play --server http://127.0.0.1:8000 --campaign demo
-```
-
-Textual TUI:
-
-```bash
-rpg-engine tui --server http://127.0.0.1:8000 --campaign demo
-```
-
-The browser reference client is served at `/client` by the API process.
-
-## SSH terminal
-
-v0.5 can expose the RPG terminal protocol through a normal SSH client. The SSH endpoint is not an
-operating-system shell and does not execute arbitrary host commands.
-
-```bash
-rpg-engine serve-ssh \
+rpg-engine serve \
   --host 127.0.0.1 \
-  --port 8022 \
-  --host-key ssh_host_key \
-  --authorized-keys authorized_keys \
-  --campaign demo
+  --port 8000 \
+  --database rpg_engine.db \
+  --content content/core \
+  --visual-bindings clients/godot/bindings.example.yaml
 ```
 
-Then connect with a standard SSH client:
+The visual binding manifest is optional. Without one, logical snapshots and terminal rendering still
+work; Godot asset paths simply remain empty.
 
-```bash
-ssh -p 8022 player@127.0.0.1
-```
+## API v1
 
-When REST/WebSocket/browser and SSH should operate on the same live campaigns, use the shared
-single-process authority mode:
-
-```bash
-rpg-engine serve-all \
-  --api-host 127.0.0.1 --api-port 8000 \
-  --ssh-host 127.0.0.1 --ssh-port 8022 \
-  --host-key ssh_host_key \
-  --authorized-keys authorized_keys
-```
-
-See [`docs/FRONTENDS.md`](docs/FRONTENDS.md) for the transport model and terminal protocol.
-
-## Stable API v1
-
-New clients should use:
+Existing v0.5 endpoints remain intact:
 
 ```text
 GET  /api/v1/health
@@ -154,223 +101,140 @@ POST /api/v1/campaigns/{id}/commands
 WS   /api/v1/campaigns/{id}/events/ws?after=N
 ```
 
-WebSocket subscriptions resume from a persistent event sequence. A client which last processed
-sequence 418 can reconnect with `?after=418`; the service replays stored events 419 onward before
-waiting for new events. This does not depend on an in-memory broadcast buffer.
-
-## Renderer-neutral observations
-
-`CampaignObservation` gives frontends a logical view rather than forcing them to render raw
-`WorldState`. A viewer-specific observation can contain:
-
-- current logical location and known exits
-- co-located actors
-- encounter round/active actor/action budget summary
-- quest progress
-- active dialogue sessions
-- equipment and currency summaries
-
-Hidden world connections stay absent until the viewer has discovered them.
-
-## Adventure command examples
-
-Explore the actor's current logical location:
-
-```json
-{
-  "type": "explore_location",
-  "actor_id": "fighter-1"
-}
-```
-
-Search for hidden content:
-
-```json
-{
-  "type": "search_location",
-  "actor_id": "fighter-1",
-  "ability": "wisdom"
-}
-```
-
-Travel over an authoritative world connection:
-
-```json
-{
-  "type": "travel",
-  "actor_id": "fighter-1",
-  "destination_id": "forest"
-}
-```
-
-Spawn an NPC from content:
-
-```json
-{
-  "type": "spawn_npc",
-  "template_id": "blacksmith",
-  "entity_id": "torvald",
-  "location_id": "village"
-}
-```
-
-Start a conversation:
-
-```json
-{
-  "type": "start_dialogue",
-  "actor_id": "fighter-1",
-  "npc_id": "torvald"
-}
-```
-
-Buy from an authoritative merchant inventory:
-
-```json
-{
-  "type": "buy_item",
-  "actor_id": "fighter-1",
-  "merchant_id": "torvald",
-  "item_id": "longsword",
-  "quantity": 1
-}
-```
-
-## Determinism and replay
-
-Randomness uses named counter-based streams:
+v0.6 adds:
 
 ```text
-campaign seed + stream name + stream counter -> deterministic roll
+GET /api/v1/campaigns/{id}/visual?actor_id=hero
+GET /api/v1/campaigns/{id}/presentation?after=N
+WS  /api/v1/campaigns/{id}/presentation/ws?after=N
 ```
 
-Adventure search and dialogue checks use the same modifier/provenance pipeline as tactical d20
-resolution. Events preserve the post-command RNG counters.
+Presentation subscriptions use the same persisted event sequence cursor as the v0.5 event stream.
+A renderer can disconnect and resume without losing presentation-relevant events.
 
-Adventure events also preserve enough resulting state to replay historical decisions without
-re-running current content rules. For example, a commerce event stores the actual historical price,
-transferred quantity, and resulting inventories/balances. Changing a merchant price tomorrow does
-not rewrite yesterday's event history.
+## Godot 2D / 3D
 
-v0.5 extends that replay property to client connectivity: event subscriptions are cursor-based and
-read from persistence, so presentation clients may disconnect without changing simulation results.
-
-## World graph and discovery
-
-`WorldLocationSpec` and `WorldConnectionSpec` define the logical world independently of rendering.
-Connections can be bidirectional, timed, tagged, and hidden.
-
-Hidden connections are unusable until an authoritative discovery reveals them. Knowledge is stored
-per actor:
+The reference adapter targets **Godot 4.7.x**. Copy:
 
 ```text
-locations
-connections
-discoveries
-containers
+clients/godot/addons/rpg_engine
 ```
 
-A search command performs one deterministic d20 resolution and can reveal every matching discovery
-whose DC is met. Discoveries can reveal locations, graph connections, and loot containers.
+into a Godot project and use:
 
-## NPCs, dialogue, and quests
+- `RPGApiClient`
+- `RPGVisualBridge2D`
+- `RPGVisualBridge3D`
 
-NPCs are instantiated from data-driven templates. Templates can bind an entity to a dialogue graph
-and merchant profile.
+The API client fetches visual snapshots, subscribes to the resumable presentation WebSocket, and can
+send normal engine commands. The bridges instantiate renderer-owned actor scenes, map logical
+coordinates, tween movement, invoke named animations, and optionally instantiate VFX/audio assets.
 
-Dialogue options can include:
+A renderer may ignore or replace any presentation hint without changing campaign state.
 
-- quest-state requirements
-- d20 checks with success/failure branches
-- quest start actions
-- quest transition triggers
-- explicit conversation termination
+See [`docs/VISUAL_ADAPTERS.md`](docs/VISUAL_ADAPTERS.md).
 
-Quests are state machines with declared states and trigger-driven transitions. Invalid transitions
-are rejected by the authoritative engine rather than being invented by a client or narrator.
+## Binding manifests
 
-## Inventory and economy
-
-v0.3 adds:
-
-- persistent container state
-- authoritative loot transfer
-- equipment slots with equip/unequip events
-- item values and tags
-- per-entity currency balances
-- merchant stock and funds
-- buy/sell multipliers and price overrides
-- exact transaction snapshots for event replay
-
-Adventure inventory/commerce actions are rejected during active tactical encounters so they cannot
-bypass v0.2 action economy.
-
-## Content remains data-driven
-
-A world connection is ordinary YAML:
+Renderer bindings are ordinary YAML and stay outside rules code:
 
 ```yaml
-id: village_forest
-from_location_id: village
-to_location_id: forest
-travel_minutes: 30
-bidirectional: true
-hidden: false
+version: 1
+scenes:
+  village:
+    scene_2d: res://world/village_2d.tscn
+    scene_3d: res://world/village_3d.tscn
+    terminal_title: Riverdale Village
+actor_tags:
+  hero:
+    scene_2d: res://actors/hero_2d.tscn
+    scene_3d: res://actors/hero_3d.tscn
+    terminal_glyph: "@"
+event_bindings:
+  actor_moved:
+    animation: walk
+    interpolation_ms: 250
 ```
 
-A quest is also data:
+The Python service treats Godot resource paths as opaque strings. It never opens or executes assets.
 
-```yaml
-id: northern_road
-name: Clear the Northern Road
-initial_state: offered
-states: [offered, investigating, ready_to_report, complete]
-terminal_states: [complete]
-transitions:
-  - from_state: offered
-    trigger: accept
-    to_state: investigating
+## Terminal and SSH visual mode
+
+The v0.5 terminal protocol remains available locally and over authenticated SSH. v0.6 adds:
+
+```text
+map [actor_id]
+visual [actor_id]
 ```
 
-The included core examples provide a tiny original village/forest/ruins loop, a blacksmith NPC,
-merchant inventory, dialogue, discoveries, containers, and a quest for automated testing.
+Both commands request `CampaignClient.visual()` and render the returned `VisualSnapshot` as ASCII.
+The SSH transport therefore becomes another renderer target rather than a special game-state path.
+
+Standalone SSH server:
+
+```bash
+rpg-engine serve-ssh \
+  --host 127.0.0.1 \
+  --port 8022 \
+  --database rpg_engine.db \
+  --content content/core \
+  --visual-bindings clients/godot/bindings.example.yaml \
+  --host-key ssh_host_key \
+  --authorized-keys authorized_keys \
+  --campaign demo
+```
+
+Connect with a normal SSH client and run `map` or `visual`. The SSH endpoint remains an RPG protocol
+server; it does not expose an operating-system shell, arbitrary subprocess execution, SFTP, or SCP.
+
+For API/Godot and SSH on one live authority service:
+
+```bash
+rpg-engine serve-all \
+  --database rpg_engine.db \
+  --content content/core \
+  --visual-bindings clients/godot/bindings.example.yaml \
+  --host-key ssh_host_key \
+  --authorized-keys authorized_keys
+```
+
+## Determinism and presentation
+
+The simulation still uses deterministic named RNG streams and event sourcing. Visual state follows a
+separate rule:
+
+```text
+authoritative world + viewer + bindings -> VisualSnapshot
+persisted event + bindings             -> PresentationBatch
+```
+
+The renderer never feeds animation completion, frame timing, VFX state, audio playback, or camera
+state back into the authoritative world. This keeps replay and multiplayer authority independent of
+rendering speed and client type.
 
 ## Repository layout
 
 ```text
 src/rpg_engine/
-|- api/              # stable v1 REST/OpenAPI + resumable WebSocket adapter
+|- api/              # v1 REST/OpenAPI + resumable WebSocket adapters
 |- clients/          # local and async HTTP client adapters
 |- content/          # content schemas/loaders
 |- persistence/      # async event/snapshot storage
 |- rules/            # ruleset interface + generic d20 runtime
-|- adventure.py      # v0.3 world/dialogue/quest/inventory/economy authority
-|- observations.py   # renderer-neutral v0.5 query models
+|- observations.py   # viewer-scoped logical observation models
+|- visuals.py        # v0.6 visual snapshots/bindings/presentation hints
+|- terminal_visual.py# ASCII renderer for the shared visual contract
 |- terminal.py       # shared CLI/TUI/SSH terminal protocol
-|- tui.py            # Textual presentation adapter
 |- ssh_server.py     # authenticated AsyncSSH RPG transport
-|- webclient.py      # embedded browser reference client
-|- commands.py       # intent contracts
-|- events.py         # immutable facts
-|- models.py         # persistent world/entity/tactical/adventure state
-|- resolution.py     # modifier pipeline + typed outcomes
-|- spatial.py        # tactical grid/graph movement/targeting contracts
-|- hooks.py          # trigger/reaction extension contracts
-|- effects.py        # composable effect execution
-|- engine.py         # authoritative command processor
-|- reducer.py        # replay reconstruction
-|- service.py        # async concurrency/persistence/event-stream boundary
+|- service.py        # async authority + event/visual query boundary
 `- cli.py            # process entrypoints
 
-content/core/
-|- world/            # locations, connections, discoveries
-|- npcs/
-|- dialogue/
-|- quests/
-|- merchants/
-|- containers/
-|- items/
-`- effects/
+clients/godot/
+|- addons/rpg_engine/
+|  |- rpg_api.gd
+|  |- visual_bridge_2d.gd
+|  `- visual_bridge_3d.gd
+`- bindings.example.yaml
 ```
 
 ## Test
@@ -384,7 +248,7 @@ pytest --cov=rpg_engine --cov-report=term-missing
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-v0.5 Multiple Frontends is implemented out of sequence because it is transport/presentation work.
-The next unimplemented simulation-depth milestone remains **v0.4 Living World**: calendar scheduling,
+v0.5 and v0.6 are implemented out of sequence because they are presentation/transport work. The next
+unimplemented **simulation-depth** milestone remains **v0.4 Living World**: calendar scheduling,
 weather, NPC schedules, factions/reputation, settlement economy, off-screen encounter resolution,
 rumors/dynamic quests, and regeneration/ecology hooks.

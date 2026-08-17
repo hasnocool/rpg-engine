@@ -1,4 +1,4 @@
-"""CLI, TUI, API, and SSH entrypoints for the headless RPG engine."""
+"""CLI, TUI, API, SSH, and visual adapter entrypoints for the RPG engine."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from rpg_engine.persistence.sqlite import SQLiteEventStore
 from rpg_engine.service import CampaignService
 from rpg_engine.ssh_server import SSHServerConfig, create_ssh_listener, create_ssh_server
 from rpg_engine.terminal import TerminalSession
+from rpg_engine.visuals import load_visual_bindings_async
 
 app = typer.Typer(no_args_is_help=True, help="Headless deterministic RPG simulation engine")
 
@@ -63,13 +64,22 @@ def demo(
 def serve(
     host: Annotated[str, typer.Option(help="Bind host")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Bind port")] = 8000,
-    reload: Annotated[bool, typer.Option(help="Enable development reload")] = False,
+    database: Annotated[Path, typer.Option(help="SQLite database path")] = Path("rpg_engine.db"),
+    content: Annotated[Path, typer.Option(help="Content pack path")] = Path("content/core"),
+    visual_bindings: Annotated[
+        Path | None, typer.Option(help="Optional visual binding manifest")
+    ] = None,
 ) -> None:
-    """Run the authoritative REST/WebSocket/browser service."""
+    """Run the authoritative REST/WebSocket/browser/visual service."""
 
     import uvicorn
 
-    uvicorn.run("rpg_engine.api.app:app", host=host, port=port, reload=reload)
+    api = create_app(
+        database_path=database,
+        content_path=content,
+        visual_bindings_path=visual_bindings,
+    )
+    uvicorn.run(api, host=host, port=port)
 
 
 @app.command()
@@ -123,6 +133,9 @@ def serve_ssh(
     port: Annotated[int, typer.Option(help="SSH bind port")] = 8022,
     database: Annotated[Path, typer.Option(help="SQLite database path")] = Path("rpg_engine.db"),
     content: Annotated[Path, typer.Option(help="Content pack path")] = Path("content/core"),
+    visual_bindings: Annotated[
+        Path | None, typer.Option(help="Optional visual binding manifest used by `map`")
+    ] = None,
     host_key: Annotated[
         Path, typer.Option(help="SSH server private host key")
     ] = Path("ssh_host_key"),
@@ -147,6 +160,7 @@ def serve_ssh(
                 authorized_keys=authorized_keys,
                 database_path=database,
                 content_path=content,
+                visual_bindings_path=visual_bindings,
                 campaign_id=campaign,
                 actor_from_username=actor_from_username,
             )
@@ -170,6 +184,9 @@ def serve_all(
         Path, typer.Option(help="Shared SQLite database path")
     ] = Path("rpg_engine.db"),
     content: Annotated[Path, typer.Option(help="Content pack path")] = Path("content/core"),
+    visual_bindings: Annotated[
+        Path | None, typer.Option(help="Optional shared visual binding manifest")
+    ] = None,
     host_key: Annotated[
         Path, typer.Option(help="SSH server private host key")
     ] = Path("ssh_host_key"),
@@ -178,7 +195,7 @@ def serve_all(
     ] = Path("authorized_keys"),
     campaign: Annotated[str | None, typer.Option(help="Optional fixed SSH campaign")] = None,
 ) -> None:
-    """Run REST/WebSocket/browser and SSH transports on one shared authority service."""
+    """Run API/browser/Godot and SSH transports on one shared authority service."""
 
     async def _run() -> None:
         import uvicorn
@@ -186,7 +203,16 @@ def serve_all(
         store = SQLiteEventStore(database)
         await store.initialize()
         registry = await load_content_pack_async(content)
-        service = CampaignService(store, content=registry)
+        bindings = (
+            await load_visual_bindings_async(visual_bindings)
+            if visual_bindings is not None
+            else None
+        )
+        service = CampaignService(
+            store,
+            content=registry,
+            visual_bindings=bindings,
+        )
         api = create_app(campaign_service=service)
         api_server = uvicorn.Server(
             uvicorn.Config(api, host=api_host, port=api_port, loop="asyncio")
@@ -200,6 +226,7 @@ def serve_all(
                 authorized_keys=authorized_keys,
                 database_path=database,
                 content_path=content,
+                visual_bindings_path=visual_bindings,
                 campaign_id=campaign,
             ),
         )

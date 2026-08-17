@@ -9,6 +9,7 @@ from rpg_engine.commands import Command
 from rpg_engine.events import Event
 from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation
+from rpg_engine.visuals import VisualSnapshot
 
 
 class CampaignClient(Protocol):
@@ -17,6 +18,8 @@ class CampaignClient(Protocol):
     async def state(self) -> WorldState: ...
 
     async def observation(self, *, actor_id: str | None = None) -> CampaignObservation: ...
+
+    async def visual(self, *, actor_id: str | None = None) -> VisualSnapshot: ...
 
     async def events(self, *, after_sequence: int = 0) -> list[Event]: ...
 

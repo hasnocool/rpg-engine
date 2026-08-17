@@ -1,0 +1,34 @@
+version: 1
+scenes:
+  village:
+    scene_2d: res://world/village_2d.tscn
+    scene_3d: res://world/village_3d.tscn
+    terminal_title: Riverdale Village
+  forest:
+    scene_2d: res://world/forest_2d.tscn
+    scene_3d: res://world/forest_3d.tscn
+actor_tags:
+  hero:
+    scene_2d: res://actors/hero_2d.tscn
+    scene_3d: res://actors/hero_3d.tscn
+    terminal_glyph: "@"
+  merchant:
+    scene_2d: res://actors/merchant_2d.tscn
+    scene_3d: res://actors/merchant_3d.tscn
+    terminal_glyph: "M"
+event_bindings:
+  actor_moved:
+    animation: walk
+    interpolation_ms: 250
+  travel_completed:
+    animation: walk
+    interpolation_ms: 400
+  dialogue_started:
+    animation: talk
+  item_equipped:
+    animation: equip
+  healing_applied:
+    animation: recover
+    vfx_2d: res://effects/recover_2d.tscn
+    vfx_3d: res://effects/recover_3d.tscn
+    audio: res://audio/recover.ogg

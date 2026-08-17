@@ -12,6 +12,7 @@ from rpg_engine.commands import Command
 from rpg_engine.events import Event, parse_event
 from rpg_engine.models import WorldState
 from rpg_engine.observations import CampaignObservation
+from rpg_engine.visuals import VisualSnapshot
 
 
 class HttpCampaignClient:
@@ -38,6 +39,14 @@ class HttpCampaignClient:
         )
         response.raise_for_status()
         return CampaignObservation.model_validate(response.json()["observation"])
+
+    async def visual(self, *, actor_id: str | None = None) -> VisualSnapshot:
+        params = {"actor_id": actor_id} if actor_id is not None else None
+        response = await self._client.get(
+            f"/api/v1/campaigns/{self.campaign_id}/visual", params=params
+        )
+        response.raise_for_status()
+        return VisualSnapshot.model_validate(response.json()["visual"])
 
     async def events(self, *, after_sequence: int = 0) -> list[Event]:
         response = await self._client.get(
