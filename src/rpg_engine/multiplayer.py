@@ -11,6 +11,7 @@ import time
 import uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -193,10 +194,8 @@ class HostedCampaignService:
         if task is None:
             return
         task.cancel()
-        try:
+        with suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
     async def _heartbeat_loop(self) -> None:
         while True:

@@ -8,7 +8,7 @@ import pytest
 
 from rpg_engine.commands import Command, MoveActorCommand
 from rpg_engine.events import ActorMovedEvent, Event, TimeAdvancedEvent
-from rpg_engine.models import Identity, Entity, Position, WorldState
+from rpg_engine.models import Entity, Identity, Position, WorldState
 from rpg_engine.multiplayer import (
     AuthorizationError,
     HostedCampaignService,
