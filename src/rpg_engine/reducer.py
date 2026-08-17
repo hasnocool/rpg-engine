@@ -308,7 +308,7 @@ def apply_event(world: WorldState, event: Event) -> None:
             memories.pop(event.memory_id, None)
             if not memories:
                 world.npc_memories.pop(event.actor_id, None)
-    elif isinstance(event, (AiProposalEvaluatedEvent, AiProposalActivatedEvent)):
+    elif isinstance(event, AiProposalEvaluatedEvent | AiProposalActivatedEvent):
         record = event.record.model_copy(deep=True)
         world.ai_proposals[record.id] = record
 

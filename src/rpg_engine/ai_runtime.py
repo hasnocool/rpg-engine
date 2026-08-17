@@ -47,13 +47,11 @@ class AIGameMasterRuntime:
     def handles(command: Command) -> bool:
         return isinstance(
             command,
-            (
-                RecordNpcMemoryCommand,
-                ForgetNpcMemoryCommand,
-                SubmitAiEncounterProposalCommand,
-                SubmitAiQuestProposalCommand,
-                ActivateAiProposalCommand,
-            ),
+            RecordNpcMemoryCommand
+            | ForgetNpcMemoryCommand
+            | SubmitAiEncounterProposalCommand
+            | SubmitAiQuestProposalCommand
+            | ActivateAiProposalCommand,
         )
 
     def _entity_exists(self, actor_id: str) -> bool:
