@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from rpg_engine.timeline import TimelineState
+
 
 class StrictModel(BaseModel):
     """Pydantic base model that rejects unknown fields in engine contracts."""
@@ -206,6 +208,7 @@ class WorldState(StrictModel):
     sequence: int = 0
     event_count: int = 0
     time_minutes: int = 0
+    timeline: TimelineState = Field(default_factory=TimelineState)
     rng_counters: dict[str, int] = Field(default_factory=dict)
     entities: dict[str, Entity] = Field(default_factory=dict)
     encounters: dict[str, EncounterState] = Field(default_factory=dict)

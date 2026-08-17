@@ -17,6 +17,7 @@ from rpg_engine.models import (
     StrictModel,
 )
 from rpg_engine.resolution import Modifier
+from rpg_engine.timeline import TimelineAdvanceSource, TimelineItem, TimeMode
 
 
 class EventBase(StrictModel):
@@ -232,6 +233,46 @@ class ReactionUsedEvent(EventBase):
     reaction_id: str
 
 
+class TimelineConfiguredEvent(EventBase):
+    type: Literal["timeline_configured"] = "timeline_configured"
+    mode: TimeMode
+    turn_quantum_ms: int
+    turn_timeout_ms: int
+    paused: bool
+    wall_clock_anchor_ms: int | None = None
+
+
+class TimelineItemScheduledEvent(EventBase):
+    type: Literal["timeline_item_scheduled"] = "timeline_item_scheduled"
+    item: TimelineItem
+
+
+class TimelineItemCancelledEvent(EventBase):
+    type: Literal["timeline_item_cancelled"] = "timeline_item_cancelled"
+    item_id: str
+
+
+class TimelineAdvancedEvent(EventBase):
+    type: Literal["timeline_advanced"] = "timeline_advanced"
+    source: TimelineAdvanceSource
+    delta_ms: int
+    time_ms: int
+    wall_clock_anchor_ms: int | None = None
+    backlog: bool = False
+
+
+class TimelineItemFiredEvent(EventBase):
+    type: Literal["timeline_item_fired"] = "timeline_item_fired"
+    item: TimelineItem
+    fired_at_ms: int
+    rescheduled_item: TimelineItem | None = None
+
+
+class TimelinePauseChangedEvent(EventBase):
+    type: Literal["timeline_pause_changed"] = "timeline_pause_changed"
+    paused: bool
+
+
 Event = Annotated[
     EntityCreatedEvent
     | ActorMovedEvent
@@ -259,7 +300,13 @@ Event = Annotated[
     | AreaTargetsResolvedEvent
     | TriggerRaisedEvent
     | ReactionOfferedEvent
-    | ReactionUsedEvent,
+    | ReactionUsedEvent
+    | TimelineConfiguredEvent
+    | TimelineItemScheduledEvent
+    | TimelineItemCancelledEvent
+    | TimelineAdvancedEvent
+    | TimelineItemFiredEvent
+    | TimelinePauseChangedEvent,
     Field(discriminator="type"),
 ]
 

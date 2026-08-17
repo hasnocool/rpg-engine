@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, model_validator
 
 from rpg_engine.models import Ability, Entity, Position, StrictModel
+from rpg_engine.timeline import TimelineItemKind, TimelinePayload, TimeMode
 
 
 class CreateEntityCommand(StrictModel):
@@ -88,6 +89,68 @@ class UseReactionCommand(StrictModel):
     reaction_id: str
 
 
+class ConfigureTimelineCommand(StrictModel):
+    type: Literal["configure_timeline"] = "configure_timeline"
+    mode: TimeMode
+    turn_quantum_ms: int | None = Field(default=None, gt=0)
+    turn_timeout_ms: int | None = Field(default=None, gt=0)
+
+
+class ScheduleTimelineItemCommand(StrictModel):
+    type: Literal["schedule_timeline_item"] = "schedule_timeline_item"
+    item_id: str
+    kind: TimelineItemKind
+    delay_ms: int | None = Field(default=None, ge=0)
+    due_ms: int | None = Field(default=None, ge=0)
+    priority: int = 0
+    actor_id: str | None = None
+    payload: TimelinePayload = Field(default_factory=dict)
+    interval_ms: int | None = Field(default=None, gt=0)
+    remaining_occurrences: int | None = Field(default=None, gt=0)
+    replace: bool = False
+
+    @model_validator(mode="after")
+    def validate_due_time(self) -> ScheduleTimelineItemCommand:
+        if self.delay_ms is not None and self.due_ms is not None:
+            raise ValueError("provide delay_ms or due_ms, not both")
+        return self
+
+
+class CancelTimelineItemCommand(StrictModel):
+    type: Literal["cancel_timeline_item"] = "cancel_timeline_item"
+    item_id: str
+
+
+class AdvanceTimelineCommand(StrictModel):
+    type: Literal["advance_timeline"] = "advance_timeline"
+    delta_ms: int = Field(gt=0)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class AdvanceTimelineTurnCommand(StrictModel):
+    type: Literal["advance_timeline_turn"] = "advance_timeline_turn"
+    turns: int = Field(default=1, gt=0, le=10_000)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class SyncTimelineCommand(StrictModel):
+    type: Literal["sync_timeline"] = "sync_timeline"
+    wall_time_ms: int = Field(ge=0)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class SetTimelinePausedCommand(StrictModel):
+    type: Literal["set_timeline_paused"] = "set_timeline_paused"
+    paused: bool
+    wall_time_ms: int | None = Field(default=None, ge=0)
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
+class DrainTimelineCommand(StrictModel):
+    type: Literal["drain_timeline"] = "drain_timeline"
+    max_firings: int = Field(default=10_000, gt=0, le=100_000)
+
+
 Command = Annotated[
     CreateEntityCommand
     | MoveActorCommand
@@ -100,7 +163,15 @@ Command = Annotated[
     | EndEncounterCommand
     | AdvanceTimeCommand
     | EndTurnCommand
-    | UseReactionCommand,
+    | UseReactionCommand
+    | ConfigureTimelineCommand
+    | ScheduleTimelineItemCommand
+    | CancelTimelineItemCommand
+    | AdvanceTimelineCommand
+    | AdvanceTimelineTurnCommand
+    | SyncTimelineCommand
+    | SetTimelinePausedCommand
+    | DrainTimelineCommand,
     Field(discriminator="type"),
 ]
 
