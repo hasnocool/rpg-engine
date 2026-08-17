@@ -104,7 +104,7 @@ Command = Annotated[
     Field(discriminator="type"),
 ]
 
-COMMAND_ADAPTER = TypeAdapter(Command)
+COMMAND_ADAPTER: TypeAdapter[Command] = TypeAdapter(Command)
 
 
 def parse_command(payload: object) -> Command:

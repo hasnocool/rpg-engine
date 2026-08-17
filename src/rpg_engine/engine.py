@@ -63,7 +63,7 @@ from rpg_engine.models import (
 from rpg_engine.resolution import ModifierPipeline, ResolutionContext, ResolutionKind
 from rpg_engine.rules.base import RulesRuntime
 from rpg_engine.rules.d20 import D20RulesRuntime
-from rpg_engine.spatial import GridSpatialAdapter, SpatialAdapter, TargetShape, TargetingContract
+from rpg_engine.spatial import GridSpatialAdapter, SpatialAdapter, TargetingContract, TargetShape
 
 
 class SimulationError(ValueError):
@@ -389,6 +389,7 @@ class SimulationEngine:
 
     def execute(self, command: Command) -> list[Event]:
         raw_events: list[EventBase]
+        encounter: EncounterState | None
 
         if isinstance(command, CreateEntityCommand):
             if command.entity.id in self.world.entities:

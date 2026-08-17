@@ -52,7 +52,7 @@ class Health(StrictModel):
     maximum: int
 
     @model_validator(mode="after")
-    def validate_current(self) -> "Health":
+    def validate_current(self) -> Health:
         if self.maximum < 0:
             raise ValueError("maximum health cannot be negative")
         if not 0 <= self.current <= self.maximum:
@@ -84,7 +84,7 @@ class ResourcePool(StrictModel):
     recharge: Literal["turn", "short_rest", "long_rest", "manual"] = "manual"
 
     @model_validator(mode="after")
-    def validate_current(self) -> "ResourcePool":
+    def validate_current(self) -> ResourcePool:
         if self.current > self.maximum:
             raise ValueError("resource current cannot exceed maximum")
         return self

@@ -263,7 +263,7 @@ Event = Annotated[
     Field(discriminator="type"),
 ]
 
-EVENT_ADAPTER = TypeAdapter(Event)
+EVENT_ADAPTER: TypeAdapter[Event] = TypeAdapter(Event)
 
 
 def parse_event(payload: object) -> Event:
