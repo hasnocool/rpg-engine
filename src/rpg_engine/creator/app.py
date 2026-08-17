@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -101,7 +101,7 @@ def create_creator_app(
     async def put_resource(
         kind: str,
         resource_id: str,
-        payload: dict[str, Any] = Body(...),
+        payload: dict[str, Any],
     ) -> ResourceRecord:
         return await _io_call(workspace.put, kind, resource_id, payload)
 
